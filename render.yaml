@@ -6,7 +6,9 @@ services:
     name: helpdesk-pro
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build --workspaces --if-present && cd apps/api && npx prisma generate
+    # --include=dev: NODE_ENV=production (below) would otherwise make npm ci
+    # skip devDependencies — vite/tsup/tsc/prisma-cli are needed at build time.
+    buildCommand: npm ci --include=dev && npm run build --workspaces --if-present && cd apps/api && npx prisma generate
     startCommand: node apps/api/dist/server.js
     healthCheckPath: /api/health
     envVars:
