@@ -17,8 +17,11 @@ export const originCheck: RequestHandler = (req: Request, res: Response, next: N
   if (!source) return next();
 
   try {
-    const { origin } = new URL(source);
-    if (webOrigins.includes(origin)) return next();
+    const { origin, host } = new URL(source);
+    // Same-host origin is inherently safe — the SPA served from this very
+    // service can't be a cross-site attacker. Keeps single-service deploys
+    // working before WEB_ORIGIN is configured.
+    if (webOrigins.includes(origin) || host === req.headers.host) return next();
   } catch {
     // unparsable → reject below
   }

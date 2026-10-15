@@ -1,0 +1,24 @@
+# Render Blueprint — one free web service serving API + built SPA.
+# Database lives on Neon (already provisioned); DATABASE_URL is set manually
+# in the dashboard since the connection string is a secret.
+services:
+  - type: web
+    name: helpdesk-pro
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build --workspaces --if-present && cd apps/api && npx prisma generate
+    startCommand: node apps/api/dist/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false # paste the Neon connection string in the dashboard
+      - key: WEB_ORIGIN
+        value: https://helpdesk-pro.onrender.com # same-origin passes anyway (origin-check allows same-host)
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+      - key: SLA_SWEEP_MINUTES
+        value: "15"

@@ -20,6 +20,8 @@ import { analyticsRouter } from './modules/analytics/analytics.router';
 import { attachmentsRouter, ticketAttachmentsRouter } from './modules/attachments/attachments.router';
 import { openApiSpec } from './openapi/spec';
 import swaggerUi from 'swagger-ui-express';
+import path from 'node:path';
+import { existsSync } from 'node:fs';
 
 /**
  * Express app assembly — kept separate from server.ts so Supertest can
@@ -86,6 +88,18 @@ export function createApp() {
   app.use('/api/v1/attachments', attachmentsRouter);
   app.use('/api/v1/comments', commentsRouter);
   app.use('/api/v1/sla-targets', slaRouter);
+
+  // Single-service production mode: serve the built SPA when a dist folder
+  // exists. Dev never hits this — Vite serves the frontend on :5173.
+  const webDist = path.resolve(process.env.WEB_DIST ?? 'apps/web/dist');
+  if (existsSync(path.join(webDist, 'index.html'))) {
+    app.use(express.static(webDist));
+    app.get('*', (req, res, next) =>
+      req.path.startsWith('/api') || req.path.startsWith('/socket.io')
+        ? next()
+        : res.sendFile(path.join(webDist, 'index.html')),
+    );
+  }
 
   app.use('/api', notFoundHandler);
   app.use(errorHandler);

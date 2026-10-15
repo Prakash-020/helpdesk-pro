@@ -1,0 +1,13 @@
+# Railway build: monorepo install → build shared consumers → run api
+# (the api serves apps/web/dist statically in production).
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build --workspaces --if-present", "cd apps/api && npx prisma generate"]
+
+[start]
+cmd = "node apps/api/dist/server.js"
