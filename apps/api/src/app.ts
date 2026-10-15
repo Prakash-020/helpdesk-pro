@@ -18,6 +18,8 @@ import { notificationsRouter } from './modules/notifications/notifications.route
 import { auditRouter } from './modules/audit/audit.router';
 import { analyticsRouter } from './modules/analytics/analytics.router';
 import { attachmentsRouter, ticketAttachmentsRouter } from './modules/attachments/attachments.router';
+import { openApiSpec } from './openapi/spec';
+import swaggerUi from 'swagger-ui-express';
 
 /**
  * Express app assembly — kept separate from server.ts so Supertest can
@@ -67,6 +69,10 @@ export function createApp() {
 
   // /api/v1 — CSRF origin check + session resolution apply to all v1 routes.
   app.use('/api/v1', originCheck, attachUser);
+
+  // OpenAPI docs — JSON spec + Swagger UI (not needed in prod but harmless)
+  app.get('/api/docs.json', (_req, res) => res.json(openApiSpec));
+  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec as never));
 
   // Feature routers:
   app.use('/api/v1/auth', authRouter);

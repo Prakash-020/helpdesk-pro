@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { PRIORITY_LABELS, TICKET_STATUS_LABELS, type Priority, type TicketStatus } from '@helpdesk/shared';
+import { PRIORITY_LABELS, type Priority, type TicketStatus } from '@helpdesk/shared';
 import { api } from '../../lib/api';
 import { LoadingState, PageHeader } from '../../components/ui';
 

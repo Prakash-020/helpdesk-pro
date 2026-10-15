@@ -4,7 +4,6 @@ import { z } from 'zod';
 import {
   paginationSchema,
   ROLES,
-  updateProfileSchema,
   type Paginated,
   type Role,
   type UpdateProfileInput,

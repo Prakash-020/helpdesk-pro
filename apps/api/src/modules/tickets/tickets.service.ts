@@ -20,7 +20,6 @@ import {
   toCommentDto,
   toTicketDto,
   toTicketSummary,
-  type TicketWithRelations,
   TICKET_INCLUDE,
 } from './serializers';
 

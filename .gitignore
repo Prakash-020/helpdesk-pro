@@ -12,6 +12,7 @@ dist/
 
 # Uploads (dev file storage)
 uploads/
+uploads-test/
 
 # Test/coverage artifacts
 coverage/

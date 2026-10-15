@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter } from 'react-router-dom';
 import { AppLayout } from '../components/AppLayout';
 import { ProtectedRoute, RoleGuard } from '../components/guards';
 import { LandingPage } from '../pages/LandingPage';

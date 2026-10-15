@@ -2,6 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import * as controller from './auth.controller';
 import { requireAuth } from '../../middleware/auth';
+import { isTest } from '../../config/env';
 import { ah } from '../../utils/async-handler';
 
 /**
@@ -18,7 +19,10 @@ const credentialsLimiter = rateLimit({
 
 export const authRouter = Router();
 
-authRouter.post('/register', credentialsLimiter, ah(controller.register));
-authRouter.post('/login', credentialsLimiter, ah(controller.login));
+// Credential endpoints are rate-limited in production; tests drive many
+// logins per run, so the limiter is bypassed under NODE_ENV=test.
+const guard = isTest ? [] : [credentialsLimiter];
+authRouter.post('/register', ...guard, ah(controller.register));
+authRouter.post('/login', ...guard, ah(controller.login));
 authRouter.post('/logout', ah(controller.logout));
 authRouter.get('/me', requireAuth, controller.me);

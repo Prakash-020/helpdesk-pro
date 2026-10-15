@@ -6,8 +6,8 @@ output observed; **Expected** = not yet run.
 
 ## Current position
 
-- **MVP feature-complete + demo-polished** — 62 seeded tickets, one-click role demos, reference-matched UI
-- **Next action:** attachments (upload/download), SLA warning sweep, test suites, Swagger, deploy docs
+- **Feature-complete per spec + tests + docs + CI** — only cloud deployment remains
+- **Next action:** deploy (Vercel web / Render API / managed PG) or extend with roadmap items (password reset, S3 uploads)
 - **Last updated:** 2026-10-15
 
 ## Phases
@@ -24,7 +24,7 @@ output observed; **Expected** = not yet run.
 | 8 | Frontend foundation | ✅ AppLayout, guards, RHF+Zod auth, typed api client, TanStack Query |
 | 9 | Customer & agent workflows | ✅ tickets/queue/assigned/detail/new-ticket live |
 | 10 | Administration | ✅ users/categories/audit/analytics pages + endpoints |
-| 11 | Advanced features | 🟡 partial — Socket.IO live updates + persisted notifications done; attachments + SLA warning job pending |
+| 11 | Advanced features | ✅ realtime + attachments + SLA sweeper + SLA admin config done; password reset/S3 remain deferred (documented) |
 | — | Demo polish | ✅ 62-ticket seed (172 comments, 94 notifications, 325 audit rows, 18 SLA-breached), one-click role demo logins, landing hero, SLA countdowns, demo badge |
 | 12 | Quality assurance | ⬜ |
 | 13 | Deployment | ⬜ |
@@ -65,6 +65,15 @@ output observed; **Expected** = not yet run.
 | curl auth matrix | register 201, me 200, no-cookie 401, bad login 401, dup 409, logout revokes ✅ |
 | curl ticket matrix | create 201, own-list 6, cross-customer 404, queue 6, assign→IN_PROGRESS, invalid transition 409, internal note hidden from customer, customer-reply flip, reopen+close, audit trail 10 rows, agent/admin 403s ✅ |
 | `curl /analytics/overview` | real aggregates (total 16, avg times) ✅ |
+| `npx vitest run` (api) | 17/17 ✅ — auth matrix, scoping, transitions, internal-note secrecy |
+| `npx vitest run` (web) | 10/10 ✅ — badges, dialog, pagination, time utils |
+| `npx playwright test` | 5/5 ✅ — demo login, customer reply, agent queue, admin pages, route guard |
+| attachments curl | upload/list/download/delete + 404 authz matrix ✅ |
+| comment ops curl | edit own ✅, stranger 404 ✅, delete ✅ |
+| sla-targets | GET/PATCH ✅, customer 403 ✅; sweep sent warnings at boot ✅ |
+| `npm run lint --workspaces` | clean ✅ |
+| `npm run build --workspaces` | api + web production builds ✅ |
+| `/api/docs` | Swagger UI live ✅ |
 
 ## Environment notes
 
