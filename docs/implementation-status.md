@@ -6,8 +6,8 @@ output observed; **Expected** = not yet run.
 
 ## Current position
 
-- **Feature-complete per spec + tests + docs + CI** — only cloud deployment remains
-- **Next action:** deploy (Vercel web / Render API / managed PG) or extend with roadmap items (password reset, S3 uploads)
+- **DEPLOYED** — live at https://helpdesk-pro-krzg.onrender.com (Render web service, Neon PG16, GitHub CI)
+- **Next action:** optional roadmap polish — ⌘K palette, activity timeline, password reset
 - **Last updated:** 2026-10-15
 
 ## Phases

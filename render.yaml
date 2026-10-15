@@ -19,7 +19,7 @@ services:
       - key: DATABASE_URL
         sync: false # paste the Neon connection string in the dashboard
       - key: WEB_ORIGIN
-        value: https://helpdesk-pro.onrender.com # same-origin passes anyway (origin-check allows same-host)
+        value: https://helpdesk-pro-krzg.onrender.com # same-origin passes anyway (origin-check allows same-host)
       - key: UPLOAD_DIR
         value: /var/data/uploads
       - key: SLA_SWEEP_MINUTES
