@@ -1,5 +1,7 @@
 # HelpDesk Pro — Customer Support Platform
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Prakash-020/helpdesk-pro)
+
 A production-style, full-stack support ticket system built as a portfolio project.
 Customers open tickets, agents triage and resolve them in realtime, admins manage
 users, categories, SLA targets and audit logs — with authorization enforced
