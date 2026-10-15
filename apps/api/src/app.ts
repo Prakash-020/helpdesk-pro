@@ -7,6 +7,9 @@ import type { HealthDto } from '@helpdesk/shared';
 import { webOrigins } from './config/env';
 import { logger } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
+import { originCheck } from './middleware/origin-check';
+import { attachUser } from './middleware/auth';
+import { authRouter } from './modules/auth/auth.router';
 
 /**
  * Express app assembly — kept separate from server.ts so Supertest can
@@ -27,6 +30,11 @@ export function createApp() {
     pinoHttp({
       logger,
       autoLogging: { ignore: (req) => req.url === '/api/health' },
+      serializers: {
+        // Compact request logs — method/url/status/duration, no header dumps.
+        req: (req) => ({ id: req.id, method: req.method, url: req.url }),
+        res: (res) => ({ statusCode: res.statusCode }),
+      },
     }),
   );
 
@@ -49,10 +57,13 @@ export function createApp() {
     });
   });
 
-  // Feature routers mount here in Phases 4-7:
-  //   app.use('/api/v1/auth', authRouter);
-  //   app.use('/api/v1/tickets', ticketsRouter);
-  //   ...
+  // /api/v1 — CSRF origin check + session resolution apply to all v1 routes.
+  app.use('/api/v1', originCheck, attachUser);
+
+  // Feature routers:
+  app.use('/api/v1/auth', authRouter);
+  //   app.use('/api/v1/tickets', ticketsRouter);   (Phase 6)
+  //   app.use('/api/v1/categories', categoriesRouter);
 
   app.use('/api', notFoundHandler);
   app.use(errorHandler);

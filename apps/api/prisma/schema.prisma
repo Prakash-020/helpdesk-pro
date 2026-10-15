@@ -1,0 +1,241 @@
+// HelpDesk Pro — PostgreSQL schema
+// Conventions: PascalCase models, camelCase fields, snake_case tables/columns
+// via @@map/@map. All timestamps are timestamptz (UTC). Indexes documented
+// in docs/architecture.md §5.4 — each serves a named query.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  AGENT
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_FOR_CUSTOMER
+  RESOLVED
+  CLOSED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum NotificationType {
+  TICKET_ASSIGNED
+  TICKET_REPLY
+  STATUS_CHANGED
+  SLA_WARNING
+}
+
+enum AuditAction {
+  TICKET_CREATED
+  TICKET_UPDATED
+  STATUS_CHANGED
+  PRIORITY_CHANGED
+  ASSIGNED
+  COMMENT_ADDED
+  CATEGORY_CREATED
+  CATEGORY_UPDATED
+  CATEGORY_DELETED
+  USER_UPDATED
+  USER_ROLE_CHANGED
+  USER_STATUS_CHANGED
+  SESSION_REVOKED
+}
+
+enum EntityType {
+  TICKET
+  USER
+  CATEGORY
+  COMMENT
+  SESSION
+}
+
+model User {
+  id            String        @id @default(uuid()) @db.Uuid
+  name          String
+  email         String        @unique // stored lowercase; enforced app-side
+  passwordHash  String        @map("password_hash")
+  role          Role          @default(CUSTOMER)
+  accountStatus AccountStatus @default(ACTIVE) @map("account_status")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  customerTickets   Ticket[]       @relation("CustomerTickets")
+  assignedTickets   Ticket[]       @relation("AssignedTickets")
+  comments          Comment[]
+  attachments       Attachment[]
+  notifications     Notification[] @relation("NotificationRecipient")
+  auditLogs         AuditLog[]
+  sessions          Session[]
+  slaTargetUpdates  SlaTarget[]
+
+  @@index([role]) // admin "filter users by role"
+  @@map("users")
+}
+
+model Session {
+  id                 String    @id @default(uuid()) @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  hashedSessionToken String    @unique @map("hashed_session_token") // SHA-256 of opaque token — raw token never stored
+  expiresAt          DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt          DateTime? @map("revoked_at") @db.Timestamptz(6)
+  ip                 String?
+  userAgent          String?   @map("user_agent")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId]) // revoke-all-on-disable
+  @@index([expiresAt]) // expired-session purge job
+  @@map("sessions")
+}
+
+model Ticket {
+  id              String       @id @default(uuid()) @db.Uuid
+  ticketNumber    String       @unique @map("ticket_number") // HD-000123, from ticket_number_seq
+  subject         String
+  description     String
+  status          TicketStatus @default(OPEN)
+  priority        Priority     @default(MEDIUM)
+  customerId      String       @map("customer_id") @db.Uuid
+  assigneeId      String?      @map("assignee_id") @db.Uuid
+  categoryId      String?      @map("category_id") @db.Uuid
+  firstResponseAt DateTime?    @map("first_response_at") @db.Timestamptz(6)
+  resolvedAt      DateTime?    @map("resolved_at") @db.Timestamptz(6)
+  closedAt        DateTime?    @map("closed_at") @db.Timestamptz(6)
+  responseDueAt   DateTime?    @map("response_due_at") @db.Timestamptz(6)
+  resolutionDueAt DateTime?    @map("resolution_due_at") @db.Timestamptz(6)
+  deletedAt       DateTime?    @map("deleted_at") @db.Timestamptz(6) // soft delete — preserves audit integrity
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  customer      User           @relation("CustomerTickets", fields: [customerId], references: [id])
+  assignee      User?          @relation("AssignedTickets", fields: [assigneeId], references: [id], onDelete: SetNull)
+  category      Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  comments      Comment[]
+  attachments   Attachment[]
+  notifications Notification[]
+
+  @@index([status, priority, createdAt(sort: Desc)]) // agent queue default view
+  @@index([assigneeId, status]) // "my assigned tickets"
+  @@index([customerId, createdAt(sort: Desc)]) // customer portal list
+  @@index([categoryId]) // category filter
+  @@index([createdAt(sort: Desc)]) // volume analytics
+  @@map("tickets")
+}
+
+model Category {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tickets Ticket[]
+
+  @@map("categories")
+}
+
+model Comment {
+  id         String   @id @default(uuid()) @db.Uuid
+  ticketId   String   @map("ticket_id") @db.Uuid
+  authorId   String   @map("author_id") @db.Uuid
+  body       String
+  isInternal Boolean  @default(false) @map("is_internal") // staff-only — filtered in query AND serializer
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  ticket      Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author      User         @relation(fields: [authorId], references: [id])
+  attachments Attachment[]
+
+  @@index([ticketId, createdAt]) // conversation thread fetch
+  @@map("comments")
+}
+
+model Attachment {
+  id               String   @id @default(uuid()) @db.Uuid
+  ticketId         String   @map("ticket_id") @db.Uuid
+  commentId        String?  @map("comment_id") @db.Uuid
+  uploaderId       String   @map("uploader_id") @db.Uuid
+  originalFilename String   @map("original_filename") // display only — never trusted
+  storageKey       String   @unique @map("storage_key") // server-generated; prevents path traversal
+  mimeType         String   @map("mime_type")
+  sizeBytes        Int      @map("size_bytes")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  ticket   Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  comment  Comment? @relation(fields: [commentId], references: [id], onDelete: SetNull)
+  uploader User     @relation(fields: [uploaderId], references: [id])
+
+  @@index([ticketId])
+  @@index([commentId])
+  @@map("attachments")
+}
+
+model Notification {
+  id          String           @id @default(uuid()) @db.Uuid
+  recipientId String           @map("recipient_id") @db.Uuid
+  ticketId    String?          @map("ticket_id") @db.Uuid
+  type        NotificationType
+  message     String
+  readAt      DateTime?        @map("read_at") @db.Timestamptz(6)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  recipient User    @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  ticket    Ticket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+
+  @@index([recipientId, createdAt(sort: Desc)]) // notification list page
+  @@index([recipientId, readAt]) // unread filter (partial index added in migration SQL)
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String      @id @default(uuid()) @db.Uuid
+  actorId    String?     @map("actor_id") @db.Uuid // null = system job
+  action     AuditAction
+  entityType EntityType  @map("entity_type")
+  entityId   String      @map("entity_id") @db.Uuid
+  metadata   Json? // sanitized diffs only — never secrets/PII
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  // Append-only by convention — no update/delete code paths anywhere.
+  @@index([entityType, entityId, createdAt]) // per-entity history
+  @@index([actorId, createdAt]) // per-user activity
+  @@map("audit_logs")
+}
+
+model SlaTarget {
+  id                   String   @id @default(uuid()) @db.Uuid
+  priority             Priority @unique
+  firstResponseMinutes Int      @map("first_response_minutes")
+  resolutionMinutes    Int      @map("resolution_minutes")
+  updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedById          String?  @map("updated_by_id") @db.Uuid
+
+  updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("sla_targets")
+}

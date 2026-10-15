@@ -42,12 +42,16 @@ emitter; `sockets/` subscribes and translates to room emissions.
 **Consequences:** Phase 11 realtime is additive — zero service refactor.
 Trade-off: single-instance only until Redis adapter (documented, post-MVP).
 
-## ADR-005 — Argon2id for password hashing
+## ADR-005 — bcrypt (bcryptjs) for password hashing
 
-**Context:** Spec: "Argon2id or well-supported alternative."
-**Decision:** `argon2` package, id variant, OWASP-recommended params.
-**Consequences:** Memory-hard resistance vs bcrypt's 72-byte limit; widely
-supported in Node 20+.
+**Context:** Spec: "Argon2id or well-supported alternative." `argon2` is a
+native module — prebuilds may miss on new Node majors → node-gyp/Xcode
+toolchain dependency for every install.
+**Decision:** `bcryptjs` (pure-JS bcrypt, cost factor 12). Zero native
+compilation, works everywhere; bcrypt remains OWASP-acceptable at cost ≥10.
+**Consequences:** Install never breaks on toolchain issues. Upgrade path:
+swap to `argon2` behind `utils/password.ts` — hashes are algorithm-prefixed
+so a migration can verify-legacy → rehash on login. Amended during Phase 2.
 
 ## ADR-006 — Postgres sequence for `ticketNumber`
 
