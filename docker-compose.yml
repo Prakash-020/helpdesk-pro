@@ -1,0 +1,34 @@
+services:
+  # Local development database.
+  # Maps host port 5433 (not 5432) so it can coexist with a Homebrew-installed
+  # PostgreSQL already listening on 5432. DATABASE_URL for this service:
+  #   postgresql://postgres:postgres@localhost:5433/helpdesk
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: helpdesk
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d helpdesk']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Optional DB browser at http://localhost:8080 — start with:
+  #   docker compose --profile tools up -d
+  adminer:
+    image: adminer:latest
+    profiles: ['tools']
+    ports:
+      - '8080:8080'
+    depends_on:
+      - db
+
+volumes:
+  pgdata:

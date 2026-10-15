@@ -1,0 +1,48 @@
+{
+  "name": "helpdesk-pro",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Full-stack customer support and ticket management platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev -w @helpdesk/api\" \"npm run dev -w @helpdesk/web\"",
+    "dev:api": "npm run dev -w @helpdesk/api",
+    "dev:web": "npm run dev -w @helpdesk/web",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:up": "docker compose up -d db",
+    "db:migrate": "npm run db:migrate -w @helpdesk/api",
+    "db:deploy": "npm run db:deploy -w @helpdesk/api",
+    "db:seed": "npm run db:seed -w @helpdesk/api",
+    "db:reset": "npm run db:reset -w @helpdesk/api"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "concurrently": "^9.1.0",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.18.2"
+  },
+  "engines": {
+    "node": ">=20",
+    "npm": ">=10"
+  },
+  "allowScripts": {
+    "esbuild@0.27.7": true,
+    "esbuild@0.28.2": true,
+    "esbuild@0.21.5": true,
+    "@prisma/engines@6.19.3": true,
+    "@prisma/client@6.19.3": true,
+    "prisma@6.19.3": true
+  }
+}

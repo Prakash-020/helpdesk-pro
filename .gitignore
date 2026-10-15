@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Environment — never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Uploads (dev file storage)
+uploads/
+
+# Test/coverage artifacts
+coverage/
+playwright-report/
+test-results/
+
+# Prisma local
+*.db-journal
+
+# OS / editor
+.DS_Store
+*.log
