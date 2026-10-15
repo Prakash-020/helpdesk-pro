@@ -29,18 +29,28 @@ interface NavItem {
   roles: Role[];
 }
 
-const NAV: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['CUSTOMER', 'AGENT', 'ADMIN'] },
-  { to: '/tickets/new', label: 'New ticket', icon: PlusCircle, roles: ['CUSTOMER'] },
-  { to: '/tickets', label: 'My tickets', icon: Inbox, roles: ['CUSTOMER'] },
-  { to: '/queue', label: 'Queue', icon: ListTodo, roles: ['AGENT', 'ADMIN'] },
-  { to: '/assigned', label: 'Assigned to me', icon: Inbox, roles: ['AGENT'] },
-  { to: '/tickets', label: 'All tickets', icon: Inbox, roles: ['ADMIN'] },
-  { to: '/notifications', label: 'Notifications', icon: Bell, roles: ['CUSTOMER', 'AGENT', 'ADMIN'] },
-  { to: '/admin/users', label: 'Users', icon: Users, roles: ['ADMIN'] },
-  { to: '/admin/categories', label: 'Categories', icon: FolderTree, roles: ['ADMIN'] },
-  { to: '/admin/analytics', label: 'Analytics', icon: BarChart3, roles: ['ADMIN'] },
-  { to: '/admin/audit', label: 'Audit log', icon: ScrollText, roles: ['ADMIN'] },
+const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
+  {
+    label: 'Workspace',
+    items: [
+      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['CUSTOMER', 'AGENT', 'ADMIN'] },
+      { to: '/tickets/new', label: 'New ticket', icon: PlusCircle, roles: ['CUSTOMER'] },
+      { to: '/tickets', label: 'My tickets', icon: Inbox, roles: ['CUSTOMER'] },
+      { to: '/queue', label: 'Requests', icon: ListTodo, roles: ['AGENT', 'ADMIN'] },
+      { to: '/assigned', label: 'Assigned to me', icon: Inbox, roles: ['AGENT'] },
+      { to: '/tickets', label: 'All tickets', icon: Inbox, roles: ['ADMIN'] },
+      { to: '/notifications', label: 'Notifications', icon: Bell, roles: ['CUSTOMER', 'AGENT', 'ADMIN'] },
+    ],
+  },
+  {
+    label: 'Admin',
+    items: [
+      { to: '/admin/users', label: 'Users', icon: Users, roles: ['ADMIN'] },
+      { to: '/admin/categories', label: 'Categories', icon: FolderTree, roles: ['ADMIN'] },
+      { to: '/admin/analytics', label: 'Analytics', icon: BarChart3, roles: ['ADMIN'] },
+      { to: '/admin/audit', label: 'Audit log', icon: ScrollText, roles: ['ADMIN'] },
+    ],
+  },
 ];
 
 function NotificationBell() {
@@ -51,8 +61,7 @@ function NotificationBell() {
   });
   const { data: recent } = useQuery({
     queryKey: ['notifications', 'recent'],
-    queryFn: () =>
-      api.get<Paginated<NotificationDto>>('/api/v1/notifications?pageSize=5'),
+    queryFn: () => api.get<Paginated<NotificationDto>>('/api/v1/notifications?pageSize=5'),
   });
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
@@ -63,11 +72,11 @@ function NotificationBell() {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label={`Notifications${count ? `, ${count} unread` : ''}`}
-        className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+        className="relative rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
       >
         <Bell className="h-5 w-5" />
         {count > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
             {count > 9 ? '9+' : count}
           </span>
         )}
@@ -75,7 +84,7 @@ function NotificationBell() {
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-40 mt-2 w-80 rounded-xl border border-slate-200 bg-white shadow-lg">
+          <div className="absolute right-0 z-40 mt-2 w-80 rounded-2xl border border-slate-200 bg-white shadow-xl">
             <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold">
               Notifications
             </div>
@@ -125,38 +134,54 @@ export function AppLayout() {
   if (!user) return null; // ProtectedRoute guarantees a user here
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <aside className="fixed inset-y-0 left-0 z-20 flex w-60 flex-col border-r border-slate-200 bg-white">
-        <div className="flex items-center gap-2 px-5 py-5 font-semibold text-slate-900">
-          <Headset className="h-6 w-6 text-brand-600" />
+    <div className="flex min-h-screen bg-slate-100">
+      {/* Dark sidebar — matches reference */}
+      <aside className="fixed inset-y-0 left-0 z-20 flex w-60 flex-col bg-slate-900">
+        <div className="flex items-center gap-2 px-5 py-6 font-semibold text-white">
+          <Headset className="h-6 w-6 text-brand-400" />
           HelpDesk Pro
         </div>
-        <nav className="flex-1 space-y-1 px-3">
-          {NAV.filter((i) => i.roles.includes(user.role)).map((item) => (
-            <NavLink
-              key={item.to + item.label}
-              to={item.to}
-              className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
-                  isActive
-                    ? 'bg-brand-50 text-brand-700'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`
-              }
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </NavLink>
-          ))}
+
+        <nav className="flex-1 space-y-6 overflow-y-auto px-3">
+          {NAV_SECTIONS.map((section) => {
+            const items = section.items.filter((i) => i.roles.includes(user.role));
+            if (items.length === 0) return null;
+            return (
+              <div key={section.label}>
+                <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+                  {section.label}
+                </p>
+                <div className="space-y-1">
+                  {items.map((item) => (
+                    <NavLink
+                      key={item.to + item.label}
+                      to={item.to}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                          isActive
+                            ? 'bg-white/10 text-white'
+                            : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                        }`
+                      }
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </nav>
-        <div className="border-t border-slate-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
+
+        <div className="border-t border-white/10 p-4">
+          <div className="flex items-center gap-3 rounded-xl bg-white/5 p-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-500 text-sm font-semibold text-white">
               {user.name.slice(0, 1).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-slate-900">{user.name}</p>
-              <p className="text-xs text-slate-500">{ROLE_LABELS[user.role]}</p>
+              <p className="truncate text-sm font-medium text-white">{user.name}</p>
+              <p className="text-xs text-slate-400">{ROLE_LABELS[user.role]}</p>
             </div>
             <button
               onClick={() => {
@@ -164,14 +189,14 @@ export function AppLayout() {
                 logout.mutate(undefined, { onSettled: () => navigate('/login') });
               }}
               aria-label="Log out"
-              className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"
             >
               <LogOut className="h-4 w-4" />
             </button>
           </div>
           <NavLink
             to="/profile"
-            className="mt-3 block rounded-lg border border-slate-200 px-3 py-1.5 text-center text-xs font-medium text-slate-600 hover:bg-slate-50"
+            className="mt-2 block rounded-xl border border-white/10 px-3 py-2 text-center text-xs font-medium text-slate-300 hover:bg-white/5"
           >
             Profile settings
           </NavLink>
@@ -179,8 +204,11 @@ export function AppLayout() {
       </aside>
 
       <main className="ml-60 flex-1 p-6 lg:p-8">
-        <div className="mb-2 flex justify-end">
+        <div className="mb-2 flex items-center justify-end gap-2">
           <NotificationBell />
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white">
+            {user.name.slice(0, 1).toUpperCase()}
+          </span>
         </div>
         <Outlet />
       </main>

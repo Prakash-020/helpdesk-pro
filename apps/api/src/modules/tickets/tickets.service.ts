@@ -189,7 +189,7 @@ export async function updateTicket(user: AuthUser, id: string, input: UpdateTick
   if (!canOperateTicket(user, ticket)) throw errors.notFound('Ticket');
 
   const diff: Record<string, { from: string | null; to: string | null }> = {};
-  for (const key of ['subject', 'description', 'categoryId'] as const) {
+  for (const key of ['subject', 'description', 'categoryId', 'priority'] as const) {
     const next = input[key];
     if (next !== undefined && next !== ticket[key]) {
       diff[key] = { from: ticket[key], to: next };
@@ -197,8 +197,26 @@ export async function updateTicket(user: AuthUser, id: string, input: UpdateTick
   }
   if (Object.keys(diff).length === 0) return toTicketDto(ticket, nowMarker());
 
+  const data: Prisma.TicketUpdateInput = { ...input };
+  // SLA targets are per-priority — re-derive due dates when priority moves.
+  if (input.priority && input.priority !== ticket.priority) {
+    const sla = await prisma.slaTarget.findUnique({ where: { priority: input.priority } });
+    if (sla) {
+      if (!ticket.firstResponseAt) {
+        data.responseDueAt = new Date(
+          ticket.createdAt.getTime() + sla.firstResponseMinutes * 60_000,
+        );
+      }
+      if (!['RESOLVED', 'CLOSED'].includes(ticket.status)) {
+        data.resolutionDueAt = new Date(
+          ticket.createdAt.getTime() + sla.resolutionMinutes * 60_000,
+        );
+      }
+    }
+  }
+
   const updated = await prisma.$transaction(async (tx) => {
-    const t = await tx.ticket.update({ where: { id }, data: input, include: TICKET_INCLUDE });
+    const t = await tx.ticket.update({ where: { id }, data, include: TICKET_INCLUDE });
     await tx.auditLog.create({
       data: {
         actorId: user.id,

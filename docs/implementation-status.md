@@ -6,8 +6,8 @@ output observed; **Expected** = not yet run.
 
 ## Current position
 
-- **Phase:** 2 — Repository & environment → **COMPLETE**
-- **Next action:** Phase 3 — Prisma schema + first migration + seed
+- **Phases 2–7 backend + Phase 8–10 frontend core → COMPLETE** (functional MVP demo live)
+- **Next action:** Phase 11 remainder — file attachments UI + uploads API, SLA warnings job; then Phase 12 QA (Vitest/Supertest/Playwright) + Phase 13 deploy
 - **Last updated:** 2026-10-15
 
 ## Phases
@@ -16,15 +16,15 @@ output observed; **Expected** = not yet run.
 |---|---|---|
 | 1 | Architecture & planning | ✅ complete |
 | 2 | Repository & environment | ✅ complete (commit `4c6cbb7`) |
-| 3 | Database foundation | ⬜ |
-| 4 | Backend foundation | ⬜ |
-| 5 | Auth & authorization | ⬜ |
-| 6 | Core ticket management | ⬜ |
-| 7 | Conversations | ⬜ |
-| 8 | Frontend foundation | ⬜ |
-| 9 | Customer & agent workflows | ⬜ |
-| 10 | Administration | ⬜ |
-| 11 | Advanced features | ⬜ |
+| 3 | Database foundation | ✅ complete — migration `20261015102652_init` applied, seed verified (6 users / 15 tickets / 14 comments / 20 notifications / 25 audit rows); all indexes confirmed via `\di` |
+| 4 | Backend foundation | ✅ complete — helmet/CORS/cookies/pino/error-contract/env-validation/health |
+| 5 | Auth & authorization | ✅ verified via curl — register/login/logout/me, bcrypt, hashed sessions, revocation, rate limit, origin check |
+| 6 | Core ticket management | ✅ verified — scoped lists, state machine (incl. invalid-transition 409, reopen window), assignment, filters/pagination/search, audit writes |
+| 7 | Conversations | ✅ verified — internal notes invisible to customers (query+serializer), customer reply auto-flips WAITING→IN_PROGRESS, firstResponseAt stamped |
+| 8 | Frontend foundation | ✅ AppLayout, guards, RHF+Zod auth, typed api client, TanStack Query |
+| 9 | Customer & agent workflows | ✅ tickets/queue/assigned/detail/new-ticket live |
+| 10 | Administration | ✅ users/categories/audit/analytics pages + endpoints |
+| 11 | Advanced features | 🟡 partial — Socket.IO live updates + persisted notifications done; attachments upload UI + SLA warning job pending |
 | 12 | Quality assurance | ⬜ |
 | 13 | Deployment | ⬜ |
 | 14 | Portfolio delivery | ⬜ |
@@ -58,6 +58,12 @@ output observed; **Expected** = not yet run.
 | `curl :4000/api/health` | `{"status":"ok"}` ✅ |
 | `curl :5173/api/health` | proxied → `{"status":"ok"}` ✅ |
 | `npm run typecheck` | clean across api/web/shared ✅ |
+| `psql pg_ctl start` | postgres running on :5432 ✅ (stale postmaster.pid removed) |
+| `prisma migrate dev` | `20261015102652_init` applied ✅ |
+| `tsx prisma/seed.ts` | 6 users / 15 tickets / 14 comments / 20 notif / 25 audit ✅ |
+| curl auth matrix | register 201, me 200, no-cookie 401, bad login 401, dup 409, logout revokes ✅ |
+| curl ticket matrix | create 201, own-list 6, cross-customer 404, queue 6, assign→IN_PROGRESS, invalid transition 409, internal note hidden from customer, customer-reply flip, reopen+close, audit trail 10 rows, agent/admin 403s ✅ |
+| `curl /analytics/overview` | real aggregates (total 16, avg times) ✅ |
 
 ## Environment notes
 

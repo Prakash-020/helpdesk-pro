@@ -47,6 +47,7 @@ export const updateTicketSchema = z.object({
   subject: z.string().trim().min(4).max(160).optional(),
   description: z.string().trim().min(10).max(10_000).optional(),
   categoryId: z.string().uuid().optional(),
+  priority: z.enum(PRIORITIES).optional(),
 });
 export type UpdateTicketInput = z.infer<typeof updateTicketSchema>;
 
