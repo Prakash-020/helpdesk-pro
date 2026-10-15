@@ -1,8 +1,33 @@
-import { Link } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Headset } from 'lucide-react';
+import { loginSchema, type LoginInput } from '@helpdesk/shared';
+import { useAuth } from '../features/auth/use-auth';
+import { Field, inputCls } from '../components/ui';
 
-/** Placeholder — the real RHF+Zod form lands in the auth phase. */
 export function LoginPage() {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from ?? '/dashboard';
+
+  const {
+    register: field,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
+
+  async function onSubmit(input: LoginInput) {
+    try {
+      await login.mutateAsync(input);
+      navigate(from, { replace: true });
+    } catch (e) {
+      setError('root', { message: e instanceof Error ? e.message : 'Login failed' });
+    }
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
@@ -11,12 +36,39 @@ export function LoginPage() {
           HelpDesk Pro
         </div>
         <h1 className="mt-6 text-xl font-bold text-slate-900">Log in</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Authentication is implemented in a later phase — this page is a placeholder.
+
+        <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
+          <Field label="Email" error={errors.email?.message}>
+            <input type="email" autoComplete="email" className={inputCls} {...field('email')} />
+          </Field>
+          <Field label="Password" error={errors.password?.message}>
+            <input
+              type="password"
+              autoComplete="current-password"
+              className={inputCls}
+              {...field('password')}
+            />
+          </Field>
+          {errors.root && <p className="text-sm text-red-600">{errors.root.message}</p>}
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          >
+            {isSubmitting ? 'Signing in…' : 'Sign in'}
+          </button>
+        </form>
+
+        <p className="mt-5 text-center text-sm text-slate-500">
+          No account?{' '}
+          <Link to="/register" className="font-medium text-brand-600 hover:underline">
+            Register
+          </Link>
         </p>
-        <Link to="/" className="mt-6 inline-block text-sm font-medium text-brand-600 hover:underline">
-          ← Back to home
-        </Link>
+        <div className="mt-6 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+          <p className="font-medium text-slate-600">Demo accounts (password: Demo!Passw0rd)</p>
+          <p className="mt-1">admin@helpdesk.dev · agent@helpdesk.dev · customer@helpdesk.dev</p>
+        </div>
       </div>
     </div>
   );

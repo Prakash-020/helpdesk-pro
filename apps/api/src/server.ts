@@ -2,13 +2,14 @@ import http from 'node:http';
 import { env } from './config/env';
 import { logger } from './utils/logger';
 import { createApp } from './app';
+import { initSockets } from './sockets/io';
 
 /**
- * Entry point. One http.Server hosts Express (REST) now and Socket.IO later —
- * io.attach(server) lands here in the realtime phase.
+ * Entry point. One http.Server hosts both Express (REST) and Socket.IO.
  */
 const app = createApp();
 const server = http.createServer(app);
+initSockets(server);
 
 server.listen(env.PORT, () => {
   logger.info({ port: env.PORT, env: env.NODE_ENV }, `API listening on http://localhost:${env.PORT}`);

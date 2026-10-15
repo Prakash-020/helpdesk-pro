@@ -1,9 +1,11 @@
-import type { CommentDto, NotificationDto, TicketSummaryDto } from './dto';
+import type { NotificationDto } from './dto';
 
 /**
- * Socket.IO contract. Names + payload types live here so both sides agree.
- * Payloads are pre-stripped DTOs — internal comments are never emitted
- * to customer-authorized rooms (enforced server-side).
+ * Socket.IO contract. Event names + payload types live here so both sides
+ * agree. PRIVACY RULE: events carry ids only (except notification, which is
+ * scoped to the recipient's own room anyway) — clients refetch the resource
+ * over REST, so no ticket content or internal notes can ever leak through
+ * a broadcast.
  */
 export const SOCKET_EVENTS = {
   /* server → client */
@@ -21,15 +23,13 @@ export const SOCKET_EVENTS = {
 export type SocketEventName = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];
 
 export interface ServerToClientEvents {
-  [SOCKET_EVENTS.TicketCreated]: (payload: { ticket: TicketSummaryDto }) => void;
-  [SOCKET_EVENTS.TicketUpdated]: (payload: { ticket: TicketSummaryDto }) => void;
-  [SOCKET_EVENTS.TicketAssigned]: (payload: {
-    ticket: TicketSummaryDto;
-    assigneeId: string | null;
-  }) => void;
-  [SOCKET_EVENTS.CommentCreated]: (payload: { ticketId: string; comment: CommentDto }) => void;
+  [SOCKET_EVENTS.TicketCreated]: (payload: { ticketId: string }) => void;
+  [SOCKET_EVENTS.TicketUpdated]: (payload: { ticketId: string }) => void;
+  [SOCKET_EVENTS.TicketAssigned]: (payload: { ticketId: string; assigneeId: string | null }) => void;
+  /** Emitted to staff rooms always; to ticket/customer rooms only when !isInternal. */
+  [SOCKET_EVENTS.CommentCreated]: (payload: { ticketId: string; isInternal: boolean }) => void;
   [SOCKET_EVENTS.NotificationCreated]: (payload: { notification: NotificationDto }) => void;
-  [SOCKET_EVENTS.TicketSlaWarning]: (payload: { ticket: TicketSummaryDto }) => void;
+  [SOCKET_EVENTS.TicketSlaWarning]: (payload: { ticketId: string }) => void;
 }
 
 export interface ClientToServerEvents {
