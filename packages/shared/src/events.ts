@@ -13,6 +13,7 @@ export const SOCKET_EVENTS = {
   TicketUpdated: 'ticket:updated',
   TicketAssigned: 'ticket:assigned',
   CommentCreated: 'comment:created',
+  AttachmentCreated: 'attachment:created',
   NotificationCreated: 'notification:created',
   TicketSlaWarning: 'ticket:sla_warning',
   /* client → server */
@@ -28,6 +29,7 @@ export interface ServerToClientEvents {
   [SOCKET_EVENTS.TicketAssigned]: (payload: { ticketId: string; assigneeId: string | null }) => void;
   /** Emitted to staff rooms always; to ticket/customer rooms only when !isInternal. */
   [SOCKET_EVENTS.CommentCreated]: (payload: { ticketId: string; isInternal: boolean }) => void;
+  [SOCKET_EVENTS.AttachmentCreated]: (payload: { ticketId: string }) => void;
   [SOCKET_EVENTS.NotificationCreated]: (payload: { notification: NotificationDto }) => void;
   [SOCKET_EVENTS.TicketSlaWarning]: (payload: { ticketId: string }) => void;
 }

@@ -42,16 +42,24 @@ enum NotificationType {
   TICKET_ASSIGNED
   TICKET_REPLY
   STATUS_CHANGED
+  ATTACHMENT_ADDED
   SLA_WARNING
 }
 
 enum AuditAction {
   TICKET_CREATED
   TICKET_UPDATED
+  TICKET_DELETED
   STATUS_CHANGED
   PRIORITY_CHANGED
   ASSIGNED
   COMMENT_ADDED
+  COMMENT_EDITED
+  COMMENT_DELETED
+  ATTACHMENT_UPLOADED
+  ATTACHMENT_DELETED
+  SLA_TARGET_UPDATED
+  SLA_WARNING_SENT
   CATEGORY_CREATED
   CATEGORY_UPDATED
   CATEGORY_DELETED
@@ -124,6 +132,7 @@ model Ticket {
   closedAt        DateTime?    @map("closed_at") @db.Timestamptz(6)
   responseDueAt   DateTime?    @map("response_due_at") @db.Timestamptz(6)
   resolutionDueAt DateTime?    @map("resolution_due_at") @db.Timestamptz(6)
+  slaWarningSentAt DateTime?   @map("sla_warning_sent_at") @db.Timestamptz(6) // set once, prevents repeat warning notifications
   deletedAt       DateTime?    @map("deleted_at") @db.Timestamptz(6) // soft delete — preserves audit integrity
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -215,7 +224,7 @@ model AuditLog {
   actorId    String?     @map("actor_id") @db.Uuid // null = system job
   action     AuditAction
   entityType EntityType  @map("entity_type")
-  entityId   String      @map("entity_id") @db.Uuid
+  entityId   String?     @map("entity_id") @db.Uuid // null for system-level actions (e.g. SLA config)
   metadata   Json? // sanitized diffs only — never secrets/PII
   createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
 

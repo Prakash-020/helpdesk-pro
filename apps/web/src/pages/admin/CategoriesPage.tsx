@@ -1,8 +1,87 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import type { CategoryDto } from '@helpdesk/shared';
+import type { CategoryDto, SlaTargetDto } from '@helpdesk/shared';
+import { PRIORITY_LABELS } from '@helpdesk/shared';
 import { api, ApiRequestError } from '../../lib/api';
 import { ConfirmDialog, inputCls, LoadingState, PageHeader, toast } from '../../components/ui';
+
+/** Per-priority SLA targets — editable by admin. */
+function SlaTargetsCard() {
+  const queryClient = useQueryClient();
+  const query = useQuery({
+    queryKey: ['sla-targets'],
+    queryFn: () => api.get<SlaTargetDto[]>('/api/v1/sla-targets'),
+  });
+  const [edit, setEdit] = useState<Record<string, { fr: string; res: string }>>({});
+
+  const save = useMutation({
+    mutationFn: (t: SlaTargetDto & { fr: string; res: string }) =>
+      api.patch(`/api/v1/sla-targets/${t.priority}`, {
+        firstResponseMinutes: Number(t.fr),
+        resolutionMinutes: Number(t.res),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sla-targets'] });
+      toast('SLA target updated — applies to new tickets');
+    },
+    onError: (e) => toast(e instanceof ApiRequestError ? e.message : 'Update failed'),
+  });
+
+  const fmt = (mins: number) => (mins >= 60 ? `${(mins / 60).toFixed(mins % 60 ? 1 : 0)}h` : `${mins}m`);
+
+  return (
+    <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="font-semibold text-slate-900">SLA targets</h2>
+      <p className="mt-1 text-sm text-slate-500">
+        Response &amp; resolution deadlines per priority (minutes). Applies to newly created tickets.
+      </p>
+      {query.isPending && <LoadingState />}
+      <div className="mt-4 space-y-3">
+        {query.data?.map((t) => {
+          const e = edit[t.priority] ?? { fr: String(t.firstResponseMinutes), res: String(t.resolutionMinutes) };
+          const dirty =
+            Number(e.fr) !== t.firstResponseMinutes || Number(e.res) !== t.resolutionMinutes;
+          return (
+            <div key={t.priority} className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="w-20 font-medium text-slate-800">{PRIORITY_LABELS[t.priority]}</span>
+              <label className="flex items-center gap-2 text-slate-500">
+                Response
+                <input
+                  type="number"
+                  min={1}
+                  value={e.fr}
+                  onChange={(ev) => setEdit({ ...edit, [t.priority]: { ...e, fr: ev.target.value } })}
+                  className={`${inputCls} w-24`}
+                />
+                <span className="text-xs text-slate-400">({fmt(t.firstResponseMinutes)})</span>
+              </label>
+              <label className="flex items-center gap-2 text-slate-500">
+                Resolution
+                <input
+                  type="number"
+                  min={1}
+                  value={e.res}
+                  onChange={(ev) => setEdit({ ...edit, [t.priority]: { ...e, res: ev.target.value } })}
+                  className={`${inputCls} w-24`}
+                />
+                <span className="text-xs text-slate-400">({fmt(t.resolutionMinutes)})</span>
+              </label>
+              {dirty && (
+                <button
+                  onClick={() => save.mutate({ ...t, ...e })}
+                  disabled={save.isPending}
+                  className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  Save
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export function CategoriesPage() {
   const queryClient = useQueryClient();
@@ -120,6 +199,8 @@ export function CategoriesPage() {
           </div>
         ))}
       </div>
+
+      <SlaTargetsCard />
 
       <ConfirmDialog
         open={confirmDelete !== null}

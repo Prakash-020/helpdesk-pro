@@ -350,6 +350,25 @@ export async function assignTicket(user: AuthUser, id: string, input: AssignTick
   return toTicketDto(updated, nowMarker());
 }
 
+/* ---------- ticket soft-delete (admin only) ---------- */
+
+export async function deleteTicket(user: AuthUser, id: string) {
+  const ticket = await findTicketOr404(id);
+  await prisma.$transaction([
+    prisma.ticket.update({ where: { id }, data: { deletedAt: new Date() } }),
+    prisma.auditLog.create({
+      data: {
+        actorId: user.id,
+        action: 'TICKET_DELETED',
+        entityType: 'TICKET',
+        entityId: id,
+        metadata: { ticketNumber: ticket.ticketNumber },
+      },
+    }),
+  ]);
+  return { ok: true };
+}
+
 /* ---------- comments ---------- */
 
 export async function listComments(user: AuthUser, ticketId: string) {
@@ -419,4 +438,70 @@ export async function addComment(user: AuthUser, ticketId: string, input: Create
 
   emitDomainEvent('comment.created', { ticketId, commentId: comment.id });
   return toCommentDto(comment, user.role);
+}
+
+/** Edit: author or admin. Customers can edit only their public comments. */
+export async function updateComment(
+  user: AuthUser,
+  commentId: string,
+  input: { body: string },
+) {
+  const comment = await prisma.comment.findUnique({
+    where: { id: commentId },
+    include: { ticket: { select: { customerId: true, assigneeId: true, deletedAt: true, status: true } } },
+  });
+  if (!comment || comment.ticket.deletedAt) throw errors.notFound('Comment');
+  if (!canViewTicket(user, comment.ticket)) throw errors.notFound('Comment');
+  if (user.role !== 'ADMIN' && comment.authorId !== user.id) {
+    throw errors.forbidden('Only the author can edit a comment');
+  }
+  if (user.role === 'CUSTOMER' && comment.isInternal) throw errors.notFound('Comment');
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const c = await tx.comment.update({
+      where: { id: commentId },
+      data: { body: input.body },
+      include: { author: true, attachments: true },
+    });
+    await tx.auditLog.create({
+      data: {
+        actorId: user.id,
+        action: 'COMMENT_EDITED',
+        entityType: 'COMMENT',
+        entityId: commentId,
+        metadata: { ticketId: comment.ticketId },
+      },
+    });
+    return c;
+  });
+  return toCommentDto(updated, user.role);
+}
+
+/** Delete: author or admin. Row is removed; audit preserves the fact. */
+export async function deleteComment(user: AuthUser, commentId: string) {
+  const comment = await prisma.comment.findUnique({
+    where: { id: commentId },
+    include: { ticket: { select: { customerId: true, assigneeId: true, deletedAt: true } } },
+  });
+  if (!comment || comment.ticket.deletedAt) throw errors.notFound('Comment');
+  if (!canViewTicket(user, comment.ticket)) throw errors.notFound('Comment');
+  if (user.role !== 'ADMIN' && comment.authorId !== user.id) {
+    throw errors.forbidden('Only the author or an admin can delete a comment');
+  }
+  if (user.role === 'CUSTOMER' && comment.isInternal) throw errors.notFound('Comment');
+
+  await prisma.$transaction([
+    prisma.attachment.updateMany({ where: { commentId }, data: { commentId: null } }),
+    prisma.comment.delete({ where: { id: commentId } }),
+    prisma.auditLog.create({
+      data: {
+        actorId: user.id,
+        action: 'COMMENT_DELETED',
+        entityType: 'COMMENT',
+        entityId: commentId,
+        metadata: { ticketId: comment.ticketId, wasInternal: comment.isInternal },
+      },
+    }),
+  ]);
+  return { ok: true };
 }

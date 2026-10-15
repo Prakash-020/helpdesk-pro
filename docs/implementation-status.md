@@ -6,8 +6,8 @@ output observed; **Expected** = not yet run.
 
 ## Current position
 
-- **Phases 2–7 backend + Phase 8–10 frontend core → COMPLETE** (functional MVP demo live)
-- **Next action:** Phase 11 remainder — file attachments UI + uploads API, SLA warnings job; then Phase 12 QA (Vitest/Supertest/Playwright) + Phase 13 deploy
+- **MVP feature-complete + demo-polished** — 62 seeded tickets, one-click role demos, reference-matched UI
+- **Next action:** attachments (upload/download), SLA warning sweep, test suites, Swagger, deploy docs
 - **Last updated:** 2026-10-15
 
 ## Phases
@@ -24,7 +24,8 @@ output observed; **Expected** = not yet run.
 | 8 | Frontend foundation | ✅ AppLayout, guards, RHF+Zod auth, typed api client, TanStack Query |
 | 9 | Customer & agent workflows | ✅ tickets/queue/assigned/detail/new-ticket live |
 | 10 | Administration | ✅ users/categories/audit/analytics pages + endpoints |
-| 11 | Advanced features | 🟡 partial — Socket.IO live updates + persisted notifications done; attachments upload UI + SLA warning job pending |
+| 11 | Advanced features | 🟡 partial — Socket.IO live updates + persisted notifications done; attachments + SLA warning job pending |
+| — | Demo polish | ✅ 62-ticket seed (172 comments, 94 notifications, 325 audit rows, 18 SLA-breached), one-click role demo logins, landing hero, SLA countdowns, demo badge |
 | 12 | Quality assurance | ⬜ |
 | 13 | Deployment | ⬜ |
 | 14 | Portfolio delivery | ⬜ |

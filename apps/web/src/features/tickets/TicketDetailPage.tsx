@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { Lock, Send } from 'lucide-react';
+import { Lock, Pencil, Send, Trash2 } from 'lucide-react';
 import {
   ALLOWED_TRANSITIONS,
   PRIORITIES,
@@ -19,6 +19,7 @@ import { SOCKET_EVENTS } from '@helpdesk/shared';
 import { getSocket } from '../../lib/socket';
 import { useAuth } from '../auth/use-auth';
 import { dueIn } from '../../lib/time';
+import { AttachmentsSection } from './AttachmentsSection';
 import {
   EmptyState,
   ErrorState,
@@ -111,6 +112,28 @@ export function TicketDetailPage() {
 
   const [body, setBody] = useState('');
   const [internal, setInternal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editBody, setEditBody] = useState('');
+
+  const editMutation = useMutation({
+    mutationFn: ({ id: cid, body: b }: { id: string; body: string }) =>
+      api.patch<CommentDto>(`/api/v1/comments/${cid}`, { body: b }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments', id] });
+      setEditingId(null);
+      toast('Comment updated');
+    },
+    onError: (e) => toast(e instanceof ApiRequestError ? e.message : 'Edit failed'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (cid: string) => api.delete(`/api/v1/comments/${cid}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments', id] });
+      toast('Comment deleted');
+    },
+    onError: (e) => toast(e instanceof ApiRequestError ? e.message : 'Delete failed'),
+  });
 
   if (ticketQuery.isPending) return <LoadingState label="Loading ticket…" />;
   if (ticketQuery.isError) {
@@ -143,6 +166,7 @@ export function TicketDetailPage() {
             <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
               {ticket.description}
             </p>
+            <AttachmentsSection ticketId={ticket.id} />
           </div>
 
           {/* Thread — chat-bubble style */}
@@ -177,8 +201,57 @@ export function TicketDetailPage() {
                           <Lock className="h-3 w-3" /> internal
                         </span>
                       )}
+                      {(mine || user!.role === 'ADMIN') && (
+                        <span className="ml-auto flex gap-1">
+                          {mine && !c.isInternal && (
+                            <button
+                              onClick={() => {
+                                setEditingId(c.id);
+                                setEditBody(c.body);
+                              }}
+                              aria-label="Edit comment"
+                              className="rounded p-0.5 hover:opacity-70"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => deleteMutation.mutate(c.id)}
+                            aria-label="Delete comment"
+                            className="rounded p-0.5 hover:opacity-70"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </span>
+                      )}
                     </div>
-                    <p className="whitespace-pre-wrap">{c.body}</p>
+                    {editingId === c.id ? (
+                      <div>
+                        <textarea
+                          rows={3}
+                          value={editBody}
+                          onChange={(e) => setEditBody(e.target.value)}
+                          className={`${inputCls} bg-white text-slate-900`}
+                        />
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            onClick={() => editMutation.mutate({ id: c.id, body: editBody })}
+                            disabled={!editBody.trim() || editMutation.isPending}
+                            className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingId(null)}
+                            className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-600"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap">{c.body}</p>
+                    )}
                   </div>
                 </div>
               );

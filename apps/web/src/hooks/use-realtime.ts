@@ -33,6 +33,9 @@ export function useRealtime(user: UserDto | null) {
       queryClient.invalidateQueries({ queryKey: ['comments', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
     });
+    socket.on(SOCKET_EVENTS.AttachmentCreated, ({ ticketId }) => {
+      queryClient.invalidateQueries({ queryKey: ['attachments', ticketId] });
+    });
     socket.on(SOCKET_EVENTS.NotificationCreated, () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     });
@@ -43,6 +46,7 @@ export function useRealtime(user: UserDto | null) {
       socket.off(SOCKET_EVENTS.TicketAssigned, invalidateTickets);
       socket.off(SOCKET_EVENTS.TicketSlaWarning, invalidateTickets);
       socket.off(SOCKET_EVENTS.CommentCreated);
+      socket.off(SOCKET_EVENTS.AttachmentCreated);
       socket.off(SOCKET_EVENTS.NotificationCreated);
     };
   }, [user, queryClient]);

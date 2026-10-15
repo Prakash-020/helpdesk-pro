@@ -132,6 +132,13 @@ export function initSockets(server: HttpServer): IoServer {
     }
   });
 
+  bus.on('attachment.uploaded', ({ ticketId }) => {
+    io.to(room.ticket(ticketId)).to(room.agents).to(room.admins).emit(
+      SOCKET_EVENTS.AttachmentCreated,
+      { ticketId },
+    );
+  });
+
   bus.on('notification.created', async ({ notificationId }) => {
     const n = await prisma.notification.findUnique({
       where: { id: notificationId },

@@ -13,6 +13,7 @@ const envSchema = z.object({
   WEB_ORIGIN: z.string().default('http://localhost:5173'),
   UPLOAD_DIR: z.string().default('./uploads'),
   MAX_UPLOAD_MB: z.coerce.number().int().positive().default(10),
+  SLA_SWEEP_MINUTES: z.coerce.number().int().positive().default(15),
 });
 
 const parsed = envSchema.safeParse(process.env);

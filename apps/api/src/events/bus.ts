@@ -14,6 +14,7 @@ export type DomainEvent =
   | { name: 'ticket.updated'; ticketId: string }
   | { name: 'ticket.assigned'; ticketId: string; assigneeId: string | null }
   | { name: 'comment.created'; ticketId: string; commentId: string }
+  | { name: 'attachment.uploaded'; ticketId: string }
   | { name: 'notification.created'; notificationId: string }
   | { name: 'sessions.revoked'; userId: string; actorId: string | null };
 

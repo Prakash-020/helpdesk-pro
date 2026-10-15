@@ -116,7 +116,7 @@ const INTERNAL_NOTES = [
   'Asked oncall — fix lands in release 4.2 next Tuesday.',
 ];
 
-const rand = <T>(arr: readonly T[]) => arr[Math.floor(Math.random() * arr.length)];
+const rand = <T>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.length)]!;
 const randInt = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000);
 const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000);
@@ -172,9 +172,9 @@ async function main() {
       { priority: Priority.URGENT, firstResponseMinutes: 30, resolutionMinutes: 4 * 60 },
     ],
   });
-  const sla = Object.fromEntries(
+  const sla = new Map(
     (await prisma.slaTarget.findMany()).map((s) => [s.priority, s]),
-  ) as Record<Priority, { firstResponseMinutes: number; resolutionMinutes: number }>;
+  );
 
   /* ---------- 60+ tickets ---------- */
   const statusPool: TicketStatus[] = [
@@ -205,11 +205,11 @@ async function main() {
   const TOTAL = Math.max(62, flatSubjects.length);
 
   for (let i = 0; i < TOTAL; i++) {
-    const entry = flatSubjects[i % flatSubjects.length];
+    const entry = flatSubjects[i % flatSubjects.length]!;
     const category = categories.find((c) => c.name === entry.cat)!;
     const customer = rand(customers);
-    const status = statusPool[i % statusPool.length];
-    const priority = priorityPool[i % priorityPool.length];
+    const status = statusPool[i % statusPool.length]!;
+    const priority = priorityPool[i % priorityPool.length]!;
 
     // createdAt spread over last ~6 days; every 10th is deliberately old
     const createdAt = i % 10 === 0 ? daysAgo(randInt(20, 30)) : hoursAgo(randInt(1, 140));
@@ -230,8 +230,8 @@ async function main() {
 
     // SLA snapshot — some tickets intentionally breach (created days ago,
     // tight targets, no response yet or never resolved)
-    const responseDueAt = new Date(createdAt.getTime() + sla[priority].firstResponseMinutes * 60_000);
-    const resolutionDueAt = new Date(createdAt.getTime() + sla[priority].resolutionMinutes * 60_000);
+    const responseDueAt = new Date(createdAt.getTime() + sla.get(priority)!.firstResponseMinutes * 60_000);
+    const resolutionDueAt = new Date(createdAt.getTime() + sla.get(priority)!.resolutionMinutes * 60_000);
 
     ticketSeeds.push({
       ticket: {
@@ -273,6 +273,7 @@ async function main() {
 
   for (const { ticket, commentCount, notifyAssignee } of ticketSeeds) {
     const created = await prisma.ticket.create({ data: ticket });
+    const createdAtDate = new Date(ticket.createdAt as Date);
     auditRows.push({
       actorId: ticket.customerId,
       action: 'TICKET_CREATED',
@@ -288,7 +289,7 @@ async function main() {
         entityType: 'TICKET',
         entityId: created.id,
         metadata: { from: null, to: ticket.assigneeId },
-        createdAt: new Date(ticket.createdAt!.getTime() + 3_600_000),
+        createdAt: new Date(createdAtDate.getTime() + 3_600_000),
       });
     }
     if (ticket.status !== 'OPEN') {
@@ -298,7 +299,7 @@ async function main() {
         entityType: 'TICKET',
         entityId: created.id,
         metadata: { from: 'OPEN', to: ticket.status },
-        createdAt: ticket.resolvedAt ?? new Date(ticket.createdAt!.getTime() + 7_200_000),
+        createdAt: ticket.resolvedAt ?? new Date(createdAtDate.getTime() + 7_200_000),
       });
     }
     if (notifyAssignee) {
@@ -307,12 +308,12 @@ async function main() {
         type: NotificationType.TICKET_ASSIGNED,
         message: `Ticket ${ticket.ticketNumber} was assigned to you`,
         ticketId: created.id,
-        createdAt: new Date(ticket.createdAt!.getTime() + 3_600_000),
+        createdAt: new Date(createdAtDate.getTime() + 3_600_000),
       });
     }
 
     /* comment thread: alternate customer/agent, occasional internal note */
-    let cursor = new Date(ticket.createdAt!.getTime() + 30 * 60_000);
+    let cursor = new Date(createdAtDate.getTime() + 30 * 60_000);
     for (let j = 0; j < commentCount; j++) {
       const isStaffTurn = j % 2 === 1 && ticket.assigneeId;
       const authorId = isStaffTurn ? ticket.assigneeId! : ticket.customerId;

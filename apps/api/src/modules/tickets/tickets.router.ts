@@ -8,7 +8,7 @@ import {
   updateStatusSchema,
   updateTicketSchema,
 } from '@helpdesk/shared';
-import { requireAuth, requireStaff } from '../../middleware/auth';
+import { requireAuth, requireAdmin, requireStaff } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { ah } from '../../utils/async-handler';
 import * as controller from './tickets.controller';
@@ -50,3 +50,15 @@ ticketsRouter.post(
   validate(createCommentSchema),
   ah(controller.addComment),
 );
+ticketsRouter.delete('/:id', requireAdmin, validate(idParam, 'params'), ah(controller.remove));
+
+/** Item-level comment ops live under /comments. */
+export const commentsRouter = Router();
+commentsRouter.use(requireAuth);
+commentsRouter.patch(
+  '/:id',
+  validate(idParam, 'params'),
+  validate(createCommentSchema.pick({ body: true })),
+  ah(controller.updateComment),
+);
+commentsRouter.delete('/:id', validate(idParam, 'params'), ah(controller.deleteComment));

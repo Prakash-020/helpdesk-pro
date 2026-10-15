@@ -90,6 +90,7 @@ export interface AttachmentDto {
   id: string;
   ticketId: string;
   commentId: string | null;
+  uploaderId: string;
   originalFilename: string;
   mimeType: string;
   sizeBytes: number;
@@ -110,13 +111,19 @@ export interface AuditLogDto {
   id: string;
   action: AuditAction;
   entityType: EntityType;
-  entityId: string;
+  entityId: string | null; // null for system-level actions (e.g. SLA config)
   actor: Pick<UserDto, 'id' | 'name' | 'role'> | null;
   metadata: Record<string, unknown> | null;
   createdAt: string;
 }
 
 /* ---------- Analytics ---------- */
+
+export interface SlaTargetDto {
+  priority: Priority;
+  firstResponseMinutes: number;
+  resolutionMinutes: number;
+}
 
 export interface AnalyticsOverviewDto {
   total: number;

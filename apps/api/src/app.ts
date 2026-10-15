@@ -10,12 +10,14 @@ import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { originCheck } from './middleware/origin-check';
 import { attachUser } from './middleware/auth';
 import { authRouter } from './modules/auth/auth.router';
-import { ticketsRouter } from './modules/tickets/tickets.router';
+import { ticketsRouter, commentsRouter } from './modules/tickets/tickets.router';
+import { slaRouter } from './modules/sla/sla.router';
 import { categoriesRouter } from './modules/categories/categories.router';
 import { usersRouter } from './modules/users/users.router';
 import { notificationsRouter } from './modules/notifications/notifications.router';
 import { auditRouter } from './modules/audit/audit.router';
 import { analyticsRouter } from './modules/analytics/analytics.router';
+import { attachmentsRouter, ticketAttachmentsRouter } from './modules/attachments/attachments.router';
 
 /**
  * Express app assembly — kept separate from server.ts so Supertest can
@@ -74,6 +76,10 @@ export function createApp() {
   app.use('/api/v1/notifications', notificationsRouter);
   app.use('/api/v1/audit-logs', auditRouter);
   app.use('/api/v1/analytics', analyticsRouter);
+  app.use('/api/v1/tickets/:id/attachments', ticketAttachmentsRouter);
+  app.use('/api/v1/attachments', attachmentsRouter);
+  app.use('/api/v1/comments', commentsRouter);
+  app.use('/api/v1/sla-targets', slaRouter);
 
   app.use('/api', notFoundHandler);
   app.use(errorHandler);

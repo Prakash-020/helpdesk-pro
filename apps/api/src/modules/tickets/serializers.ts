@@ -87,6 +87,7 @@ export function toAttachmentDto(a: {
   id: string;
   ticketId: string;
   commentId: string | null;
+  uploaderId: string;
   originalFilename: string;
   mimeType: string;
   sizeBytes: number;
@@ -96,6 +97,7 @@ export function toAttachmentDto(a: {
     id: a.id,
     ticketId: a.ticketId,
     commentId: a.commentId,
+    uploaderId: a.uploaderId,
     originalFilename: a.originalFilename,
     mimeType: a.mimeType,
     sizeBytes: a.sizeBytes,

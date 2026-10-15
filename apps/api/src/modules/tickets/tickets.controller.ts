@@ -36,3 +36,15 @@ export async function addComment(req: Request, res: Response) {
   const comment = await service.addComment(req.user!, req.params.id as string, req.body);
   res.status(201).json(comment);
 }
+
+export async function remove(req: Request, res: Response) {
+  res.json(await service.deleteTicket(req.user!, req.params.id as string));
+}
+
+export async function updateComment(req: Request, res: Response) {
+  res.json(await service.updateComment(req.user!, req.params.id as string, req.body));
+}
+
+export async function deleteComment(req: Request, res: Response) {
+  res.json(await service.deleteComment(req.user!, req.params.id as string));
+}
