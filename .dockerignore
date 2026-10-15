@@ -1,0 +1,10 @@
+node_modules
+**/dist
+.env
+.env.*
+uploads/
+uploads-test/
+test-results/
+playwright-report/
+docs/screenshots
+.git

@@ -5,6 +5,8 @@ import { PRIORITY_LABELS } from '@helpdesk/shared';
 import { api, ApiRequestError } from '../../lib/api';
 import { ConfirmDialog, inputCls, LoadingState, PageHeader, toast } from '../../components/ui';
 
+const filterCls = inputCls.replace('w-full', '');
+
 /** Per-priority SLA targets — editable by admin. */
 function SlaTargetsCard() {
   const queryClient = useQueryClient();
@@ -51,7 +53,7 @@ function SlaTargetsCard() {
                   min={1}
                   value={e.fr}
                   onChange={(ev) => setEdit({ ...edit, [t.priority]: { ...e, fr: ev.target.value } })}
-                  className={`${inputCls} w-24`}
+                  className={`${filterCls} w-24`}
                 />
                 <span className="text-xs text-slate-400">({fmt(t.firstResponseMinutes)})</span>
               </label>
@@ -62,7 +64,7 @@ function SlaTargetsCard() {
                   min={1}
                   value={e.res}
                   onChange={(ev) => setEdit({ ...edit, [t.priority]: { ...e, res: ev.target.value } })}
-                  className={`${inputCls} w-24`}
+                  className={`${filterCls} w-24`}
                 />
                 <span className="text-xs text-slate-400">({fmt(t.resolutionMinutes)})</span>
               </label>
@@ -142,13 +144,13 @@ export function CategoriesPage() {
           placeholder="New category name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className={`${inputCls} w-52`}
+          className={`${filterCls} w-52`}
         />
         <input
           placeholder="Description (optional)"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className={`${inputCls} flex-1`}
+          className={`${filterCls} flex-1`}
         />
         <button
           type="submit"

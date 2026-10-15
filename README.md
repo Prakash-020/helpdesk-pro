@@ -14,6 +14,16 @@ server-side on every route.
 | Agent | `agent@helpdesk.dev` | `Demo!Passw0rd` |
 | Admin | `admin@helpdesk.dev` | `Demo!Passw0rd` |
 
+## Screenshots
+
+| Landing + one-click demo | Agent queue (priority cards + grouped list) |
+|---|---|
+| ![Landing](docs/screenshots/01-landing.png) | ![Queue](docs/screenshots/03-queue.png) |
+
+| Ticket detail (chat + info panel) | Admin analytics |
+|---|---|
+| ![Ticket](docs/screenshots/04-ticket-detail.png) | ![Analytics](docs/screenshots/05-analytics.png) |
+
 ---
 
 ## Highlights
@@ -96,6 +106,14 @@ createdb helpdesk && createdb helpdesk_test
 
 **API docs:** `http://localhost:4000/api/docs` (Swagger UI) · spec at `/api/docs.json`
 
+## Deployment
+
+`docs/deployment.md` covers the full path: Vercel (web) + Render (API) + Neon
+(Postgres), the complete env-var contract, a production checklist, and a
+Dockerfile (`apps/api/Dockerfile`) for container deploys. Key env vars for the
+SPA: `VITE_API_URL` (API origin) + `VITE_SOCKET_URL` (optional, when sockets
+can't ride the same host).
+
 ## Testing
 
 - `apps/api/tests/` — 17 Supertest cases covering the auth matrix, customer
@@ -122,7 +140,7 @@ apps/api/src        modules/ (auth, tickets, categories, users, notifications,
                     events/, jobs/ (sla-sweep), openapi/
 packages/shared/src enums, dto, schemas (zod), events (socket contract)
 prisma/             schema (9 models), migrations, demo seed
-docs/               architecture.md, decisions.md, implementation-status.md
+docs/               architecture.md, decisions.md, deployment.md, implementation-status.md, screenshots/
 e2e/                Playwright specs        .github/workflows/ci.yml
 ```
 

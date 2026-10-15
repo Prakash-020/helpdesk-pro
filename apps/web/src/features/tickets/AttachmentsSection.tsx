@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, Paperclip, Trash2, Upload } from 'lucide-react';
 import type { AttachmentDto } from '@helpdesk/shared';
-import { api, ApiRequestError } from '../../lib/api';
+import { api, ApiRequestError, BASE } from '../../lib/api';
 import { useAuth } from '../auth/use-auth';
 import { toast } from '../../components/ui';
 
@@ -26,7 +26,7 @@ export function AttachmentsSection({ ticketId }: { ticketId: string }) {
     mutationFn: async (file: File) => {
       const form = new FormData();
       form.append('file', file);
-      const res = await fetch(`/api/v1/tickets/${ticketId}/attachments`, {
+      const res = await fetch(`${BASE}/api/v1/tickets/${ticketId}/attachments`, {
         method: 'POST',
         body: form,
         credentials: 'include',
@@ -93,7 +93,7 @@ export function AttachmentsSection({ ticketId }: { ticketId: string }) {
                 <Paperclip className="h-4 w-4 shrink-0 text-slate-400" />
                 <div className="min-w-0">
                   <a
-                    href={`/api/v1/attachments/${a.id}`}
+                    href={`${BASE}/api/v1/attachments/${a.id}`}
                     className="block truncate font-medium text-slate-800 hover:text-brand-600"
                   >
                     {a.originalFilename}
@@ -105,7 +105,7 @@ export function AttachmentsSection({ ticketId }: { ticketId: string }) {
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <a
-                  href={`/api/v1/attachments/${a.id}`}
+                  href={`${BASE}/api/v1/attachments/${a.id}`}
                   aria-label="Download"
                   className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                 >

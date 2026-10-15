@@ -4,6 +4,8 @@ import { AUDIT_ACTIONS, ENTITY_TYPES, type AuditLogDto, type Paginated } from '@
 import { api } from '../../lib/api';
 import { inputCls, LoadingState, PageHeader, Pagination } from '../../components/ui';
 
+const filterCls = inputCls.replace('w-full', '');
+
 export function AuditLogPage() {
   const [page, setPage] = useState(1);
   const [action, setAction] = useState('');
@@ -24,13 +26,13 @@ export function AuditLogPage() {
     <div>
       <PageHeader title="Audit log" />
       <div className="mb-4 flex gap-2">
-        <select value={action} onChange={(e) => { setAction(e.target.value); setPage(1); }} className={`${inputCls} w-56`}>
+        <select value={action} onChange={(e) => { setAction(e.target.value); setPage(1); }} className={`${filterCls} w-56`}>
           <option value="">All actions</option>
           {AUDIT_ACTIONS.map((a) => (
             <option key={a} value={a}>{a.replaceAll('_', ' ')}</option>
           ))}
         </select>
-        <select value={entityType} onChange={(e) => { setEntityType(e.target.value); setPage(1); }} className={`${inputCls} w-44`}>
+        <select value={entityType} onChange={(e) => { setEntityType(e.target.value); setPage(1); }} className={`${filterCls} w-44`}>
           <option value="">All entities</option>
           {ENTITY_TYPES.map((t) => (
             <option key={t} value={t}>{t}</option>

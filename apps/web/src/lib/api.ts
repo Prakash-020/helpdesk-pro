@@ -6,7 +6,7 @@ import type { ApiErrorBody } from '@helpdesk/shared';
  * no token is ever stored in JS-accessible storage.
  */
 
-const BASE = import.meta.env.VITE_API_URL ?? '';
+export const BASE = import.meta.env.VITE_API_URL ?? '';
 
 export class ApiRequestError extends Error {
   constructor(

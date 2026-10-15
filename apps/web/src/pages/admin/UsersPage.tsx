@@ -18,6 +18,8 @@ import {
 } from '../../components/ui';
 import { useAuth } from '../../features/auth/use-auth';
 
+const filterCls = inputCls.replace('w-full', '');
+
 export function UsersPage() {
   const { user: me } = useAuth();
   const queryClient = useQueryClient();
@@ -57,7 +59,7 @@ export function UsersPage() {
             setSearch(e.target.value);
             setPage(1);
           }}
-          className={`${inputCls} w-64`}
+          className={`${filterCls} w-64`}
         />
         <select
           value={roleFilter}
@@ -65,7 +67,7 @@ export function UsersPage() {
             setRoleFilter(e.target.value);
             setPage(1);
           }}
-          className={`${inputCls} w-40`}
+          className={`${filterCls} w-40`}
         >
           <option value="">All roles</option>
           {ROLES.map((r) => (

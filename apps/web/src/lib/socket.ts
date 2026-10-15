@@ -8,7 +8,11 @@ let socket: AppSocket | null = null;
 /** Singleton socket — connects lazily once a user is authenticated. */
 export function getSocket(): AppSocket {
   if (!socket) {
-    socket = io('/', {
+    // In dev we connect to the Vite origin (proxy handles /socket.io).
+    // In prod point at the API origin directly when they're on different hosts.
+    const target =
+      import.meta.env.VITE_SOCKET_URL ?? import.meta.env.VITE_API_URL ?? '/';
+    socket = io(target, {
       withCredentials: true, // session cookie rides the handshake
       transports: ['websocket', 'polling'],
       autoConnect: true,
