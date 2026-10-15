@@ -65,9 +65,38 @@ export function LoginPage() {
             Register
           </Link>
         </p>
-        <div className="mt-6 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
-          <p className="font-medium text-slate-600">Demo accounts (password: Demo!Passw0rd)</p>
-          <p className="mt-1">admin@helpdesk.dev · agent@helpdesk.dev · customer@helpdesk.dev</p>
+
+        {/* One-click demo roles */}
+        <div className="mt-6 border-t border-slate-100 pt-5">
+          <p className="mb-2 text-center text-xs font-medium text-slate-500">
+            One-click demo (password: Demo!Passw0rd)
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                ['Customer', 'customer@helpdesk.dev'],
+                ['Agent', 'agent@helpdesk.dev'],
+                ['Admin', 'admin@helpdesk.dev'],
+              ] as const
+            ).map(([label, email]) => (
+              <button
+                key={email}
+                type="button"
+                disabled={isSubmitting || login.isPending}
+                onClick={async () => {
+                  try {
+                    await login.mutateAsync({ email, password: 'Demo!Passw0rd' });
+                    navigate('/dashboard', { replace: true });
+                  } catch (e) {
+                    setError('root', { message: e instanceof Error ? e.message : 'Demo login failed' });
+                  }
+                }}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

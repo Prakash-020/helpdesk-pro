@@ -1,328 +1,374 @@
 import {
+  AccountStatus,
   PrismaClient,
-  type Priority,
-  type Role,
-  type TicketStatus,
+  Priority,
+  Role,
+  TicketStatus,
+  NotificationType,
+  type Prisma,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 /**
- * Idempotent dev seed. Creates demo users (one per role, then extras),
- * categories, SLA targets, and a realistic spread of tickets + comments +
- * notifications + audit rows. Safe to run repeatedly: wipes transactional
- * tables (tickets/comments/notifications/audit) then recreates them;
- * users/categories/SLA are upserted.
- *
- * Demo credentials (documented in README, NEVER used in production):
- *   admin@helpdesk.dev    / Demo!Passw0rd  (ADMIN)
- *   agent@helpdesk.dev    / Demo!Passw0rd  (AGENT)
- *   customer@helpdesk.dev / Demo!Passw0rd  (CUSTOMER)
+ * Demo seed — deterministic-ish, idempotent (skips if users exist).
+ * Produces a realistic dataset for demos and screenshots:
+ *   6 users · 5 categories · 4 SLA targets · 60 tickets across statuses
+ *   (some SLA-breached), comment threads, notifications, audit logs.
+ * Demo password for every account: Demo!Passw0rd
  */
 const prisma = new PrismaClient();
 
-const DEMO_PASSWORD = 'Demo!Passw0rd';
-const now = Date.now();
-const hoursAgo = (h: number) => new Date(now - h * 3_600_000);
-
-const SLA_BY_PRIORITY: Record<Priority, { firstResponseMinutes: number; resolutionMinutes: number }> = {
-  LOW: { firstResponseMinutes: 24 * 60, resolutionMinutes: 72 * 60 },
-  MEDIUM: { firstResponseMinutes: 8 * 60, resolutionMinutes: 24 * 60 },
-  HIGH: { firstResponseMinutes: 2 * 60, resolutionMinutes: 8 * 60 },
-  URGENT: { firstResponseMinutes: 30, resolutionMinutes: 2 * 60 },
-};
-
-async function nextTicketNumber(): Promise<string> {
+async function nextTicketNumber() {
   const [{ nextval }] = await prisma.$queryRaw<[{ nextval: bigint }]>`
     SELECT nextval('ticket_number_seq')`;
   return `HD-${String(nextval).padStart(6, '0')}`;
 }
 
+/* ---------- realistic content pools ---------- */
+
+const SUBJECTS: Record<string, string[]> = {
+  Billing: [
+    'Charged twice for annual plan',
+    'Invoice shows wrong company name',
+    'Cancel subscription at period end',
+    'Refund not received after 14 days',
+    'Upgrade charged full price instead of prorated',
+    'Tax/VAT number missing from invoice',
+    'Discount code not applied at checkout',
+    'Payment failed but card was charged',
+    'Change billing email for receipts',
+    'Plan downgrade took effect immediately, want refund',
+  ],
+  'Technical Support': [
+    'Cannot log in — infinite redirect loop',
+    'Two-factor auth setup fails',
+    'Dashboard charts show stale data',
+    'Mobile app crashes on ticket submit',
+    'SSO login fails with SAML error',
+    'API returns 429 without rate limit hit',
+    'Export to PDF produces blank file',
+    'App freezes when uploading large attachment',
+    'Search returns no results for existing tickets',
+    'Webhook deliveries silently failing',
+    'Browser extension conflicts with dashboard',
+    'Session expires after 2 minutes',
+    'Dark mode breaks form inputs',
+    'Autocomplete suggests wrong values',
+    'Page loads blank in Safari only',
+  ],
+  'Feature Request': [
+    'Feature request: dark mode',
+    'Add calendar view for tickets',
+    'Slack integration for notifications',
+    'Bulk ticket operations needed',
+    'Custom ticket fields support',
+    'Public roadmap / voting board',
+    'CSV export of ticket history',
+    'Keyboard shortcuts for agents',
+    'Multi-language support portal',
+    'Auto-responders for common questions',
+  ],
+  'Account Management': [
+    'Change account owner / admin',
+    'Add team member — seat limit reached',
+    'Delete old employee account',
+    'Merge two company accounts',
+    'Update company name on profile',
+    'Transfer data after acquisition',
+    'Enable SAML SSO for the org',
+    'Restrict agent access by department',
+  ],
+  'Bug Report': [
+    'Typing in reply box loses focus randomly',
+    'Avatar upload crops image incorrectly',
+    'Notification badge count never clears',
+    'Sorting by date shows wrong order',
+    'Ticket link in email is broken (404)',
+    'Attachments download as empty files',
+    'Filters reset after viewing a ticket',
+    'Comment editor strips line breaks',
+  ],
+};
+
+const AGENT_REPLIES = [
+  'Thanks for reporting this — I can reproduce it on my end. Investigating now.',
+  'Could you share the exact steps that trigger this? A screenshot would help.',
+  'We have identified the cause. A fix is going out in the next deploy.',
+  'This is a known issue our engineers are actively working on.',
+  'I have escalated this to the engineering team for a deeper look.',
+  'Can you try clearing your browser cache and let me know if it persists?',
+  'I have applied the credit to your account — should reflect within 24h.',
+  'Good news — this is now resolved on our end. Please confirm.',
+];
+const CUSTOMER_REPLIES = [
+  'Here are the steps: 1) open settings 2) click save 3) error appears.',
+  'Still happening after clearing cache — tried on two browsers.',
+  'The file size is about 40MB if that matters.',
+  'That worked, thank you so much!',
+  'I tried the workaround but the issue came back today.',
+  'This is blocking our whole team, would appreciate an ETA.',
+];
+const INTERNAL_NOTES = [
+  'Reproduced locally — looks like a race condition in the worker queue.',
+  'Checked logs: repeated 500s from the payments webhook. Eng ticket ENG-4412.',
+  'Customer has high LTV — prioritize if possible.',
+  'Duplicate of an earlier report; merging context. Do not close yet.',
+  'Asked oncall — fix lands in release 4.2 next Tuesday.',
+];
+
+const rand = <T>(arr: readonly T[]) => arr[Math.floor(Math.random() * arr.length)];
+const randInt = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
+const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000);
+const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000);
+
 async function main() {
-  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
+  if ((await prisma.user.count()) > 0) {
+    console.log('Database already seeded — skipping.');
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash('Demo!Passw0rd', 12);
 
   /* ---------- users ---------- */
-  const seedUser = (name: string, email: string, role: Role) =>
-    prisma.user.upsert({
-      where: { email },
-      update: { name, role },
-      create: { name, email, role, passwordHash },
-    });
-
-  const [admin, agentA, agentB, custA, custB, custC] = await Promise.all([
-    seedUser('Ava Admin', 'admin@helpdesk.dev', 'ADMIN'),
-    seedUser('Sam Support', 'agent@helpdesk.dev', 'AGENT'),
-    seedUser('Riley Resolver', 'agent2@helpdesk.dev', 'AGENT'),
-    seedUser('Casey Customer', 'customer@helpdesk.dev', 'CUSTOMER'),
-    seedUser('Morgan Mercer', 'customer2@helpdesk.dev', 'CUSTOMER'),
-    seedUser('Jordan Jiang', 'customer3@helpdesk.dev', 'CUSTOMER'),
-  ]);
-  const agents = [agentA, agentB];
-  const customers = [custA, custB, custC];
+  const users = await Promise.all(
+    (
+      [
+        { name: 'Ava Admin', email: 'admin@helpdesk.dev', role: Role.ADMIN },
+        { name: 'Sam Support', email: 'agent@helpdesk.dev', role: Role.AGENT },
+        { name: 'Riley Resolver', email: 'agent2@helpdesk.dev', role: Role.AGENT },
+        { name: 'Nina Navigator', email: 'agent3@helpdesk.dev', role: Role.AGENT },
+        { name: 'Casey Customer', email: 'customer@helpdesk.dev', role: Role.CUSTOMER },
+        { name: 'Chris Client', email: 'customer2@helpdesk.dev', role: Role.CUSTOMER },
+        { name: 'Morgan Miller', email: 'customer3@helpdesk.dev', role: Role.CUSTOMER },
+        { name: 'Taylor Tenant', email: 'customer4@helpdesk.dev', role: Role.CUSTOMER },
+      ] as const
+    ).map((u) =>
+      prisma.user.create({ data: { ...u, passwordHash, accountStatus: AccountStatus.ACTIVE } }),
+    ),
+  );
+  const admin = users[0]!;
+  const agents = users.slice(1, 4);
+  const customers = users.slice(4);
 
   /* ---------- categories ---------- */
-  const categoryDefs = [
-    { name: 'Billing', description: 'Invoices, payments, refunds, subscriptions' },
-    { name: 'Technical', description: 'Bugs, errors, performance, integrations' },
-    { name: 'Account', description: 'Login, profile, security, permissions' },
-    { name: 'General', description: 'Everything else' },
-  ];
-  const categories: Record<string, { id: string }> = {};
-  for (const c of categoryDefs) {
-    const row = await prisma.category.upsert({
-      where: { name: c.name },
-      update: { description: c.description },
-      create: c,
-    });
-    categories[c.name] = row;
-  }
+  const categories = await Promise.all(
+    Object.keys(SUBJECTS).map((name, i) =>
+      prisma.category.create({
+        data: {
+          name,
+          description: `${name} requests`,
+          isActive: i < 4 || Math.random() > 0.5, // occasionally seed an inactive one
+        },
+      }),
+    ),
+  );
 
   /* ---------- SLA targets ---------- */
-  for (const [priority, t] of Object.entries(SLA_BY_PRIORITY) as [Priority, (typeof SLA_BY_PRIORITY)[Priority]][]) {
-    await prisma.slaTarget.upsert({
-      where: { priority },
-      update: t,
-      create: { priority, ...t },
-    });
-  }
+  await prisma.slaTarget.createMany({
+    data: [
+      { priority: Priority.LOW, firstResponseMinutes: 8 * 60, resolutionMinutes: 96 * 60 },
+      { priority: Priority.MEDIUM, firstResponseMinutes: 4 * 60, resolutionMinutes: 48 * 60 },
+      { priority: Priority.HIGH, firstResponseMinutes: 60, resolutionMinutes: 8 * 60 },
+      { priority: Priority.URGENT, firstResponseMinutes: 30, resolutionMinutes: 4 * 60 },
+    ],
+  });
+  const sla = Object.fromEntries(
+    (await prisma.slaTarget.findMany()).map((s) => [s.priority, s]),
+  ) as Record<Priority, { firstResponseMinutes: number; resolutionMinutes: number }>;
 
-  /* ---------- wipe transactional data (dev only) ---------- */
-  await prisma.$transaction([
-    prisma.notification.deleteMany(),
-    prisma.auditLog.deleteMany(),
-    prisma.attachment.deleteMany(),
-    prisma.comment.deleteMany(),
-    prisma.ticket.deleteMany(),
-  ]);
-  await prisma.$executeRaw`SELECT setval('ticket_number_seq', 1, false)`;
-
-  /* ---------- tickets + threads ---------- */
-  type TicketSeed = {
-    subject: string;
-    description: string;
-    status: TicketStatus;
-    priority: Priority;
-    customerIdx: number;
-    category: string;
-    assigneeIdx?: number;
-    createdHrsAgo: number;
-    replies?: { author: 'customer' | 'agent'; body: string; internal?: boolean; hrsAgo: number }[];
-  };
-
-  const ticketSeeds: TicketSeed[] = [
-    {
-      subject: 'Charged twice for annual plan',
-      description: 'I upgraded to the annual plan on Monday and my card shows two identical charges. Can someone confirm and refund the duplicate?',
-      status: 'IN_PROGRESS', priority: 'URGENT', customerIdx: 0, category: 'Billing', assigneeIdx: 0, createdHrsAgo: 30,
-      replies: [
-        { author: 'agent', body: 'Hi Casey — I can see the duplicate charge. I\'ve escalated to our billing processor for a refund within 3–5 business days.', hrsAgo: 28 },
-        { author: 'agent', body: 'Stripe dispute ref ch_3Oa… — verified duplicate, refund issued.', internal: true, hrsAgo: 27 },
-      ],
-    },
-    {
-      subject: 'Cannot log in after password change',
-      description: 'I reset my password yesterday and now I get "invalid credentials" with the new password. Old password also fails.',
-      status: 'WAITING_FOR_CUSTOMER', priority: 'HIGH', customerIdx: 1, category: 'Account', assigneeIdx: 0, createdHrsAgo: 50,
-      replies: [
-        { author: 'agent', body: 'Could you try logging in from an incognito window? This helps us rule out a cached session.', hrsAgo: 46 },
-      ],
-    },
-    {
-      subject: 'Dashboard charts show stale data',
-      description: 'The analytics page shows numbers from last week even after several refresh attempts. Filtering by date does not update the charts.',
-      status: 'OPEN', priority: 'MEDIUM', customerIdx: 0, category: 'Technical', createdHrsAgo: 20,
-    },
-    {
-      subject: 'Request: export tickets to CSV',
-      description: 'Is there a way to export our support history? We need it for quarterly reporting.',
-      status: 'RESOLVED', priority: 'LOW', customerIdx: 2, category: 'General', assigneeIdx: 1, createdHrsAgo: 120,
-      replies: [
-        { author: 'agent', body: 'CSV export is available under Reports → Export. I\'ve enabled it on your account.', hrsAgo: 100 },
-        { author: 'customer', body: 'Found it — thank you!', hrsAgo: 96 },
-      ],
-    },
-    {
-      subject: 'API returns 500 on ticket list endpoint',
-      description: 'GET /tickets intermittently returns HTTP 500 for our integration user. Started after the last deploy.',
-      status: 'IN_PROGRESS', priority: 'URGENT', customerIdx: 1, category: 'Technical', assigneeIdx: 1, createdHrsAgo: 12,
-      replies: [
-        { author: 'agent', body: 'Reproduced — looks like a pagination edge case. Engineering is deploying a fix.', hrsAgo: 6 },
-        { author: 'agent', body: 'Root cause: null order-by column on archived rows. PR opened.', internal: true, hrsAgo: 5 },
-      ],
-    },
-    {
-      subject: 'How do I add a teammate to our account?',
-      description: 'We have a new support rep starting Monday. How do I give them access?',
-      status: 'CLOSED', priority: 'LOW', customerIdx: 2, category: 'Account', assigneeIdx: 0, createdHrsAgo: 200,
-      replies: [
-        { author: 'agent', body: 'Admins can invite teammates under Settings → Team. Invite sent!', hrsAgo: 190 },
-        { author: 'customer', body: 'Perfect, all set.', hrsAgo: 188 },
-      ],
-    },
-    {
-      subject: 'Invoice shows wrong company name',
-      description: 'Our legal entity changed last month. Please update the invoice header to "Mercer Analytics Ltd".',
-      status: 'OPEN', priority: 'MEDIUM', customerIdx: 1, category: 'Billing', createdHrsAgo: 8,
-    },
-    {
-      subject: 'Mobile app crashes on ticket submit',
-      description: 'On iOS 26 the app force-closes when I attach a photo to a new ticket.',
-      status: 'OPEN', priority: 'HIGH', customerIdx: 0, category: 'Technical', createdHrsAgo: 4,
-    },
-    {
-      subject: 'Slow page loads in EU region',
-      description: 'Pages take 8–10s to load from our Berlin office since Tuesday. US colleagues see normal speeds.',
-      status: 'IN_PROGRESS', priority: 'HIGH', customerIdx: 2, category: 'Technical', assigneeIdx: 1, createdHrsAgo: 60,
-      replies: [
-        { author: 'agent', body: 'We\'re seeing elevated latency on the EU edge. CDN provider is investigating.', hrsAgo: 40 },
-      ],
-    },
-    {
-      subject: 'Cancel subscription at period end',
-      description: 'We want to cancel auto-renewal but keep access until our term ends in March.',
-      status: 'RESOLVED', priority: 'MEDIUM', customerIdx: 0, category: 'Billing', assigneeIdx: 0, createdHrsAgo: 300,
-      replies: [
-        { author: 'agent', body: 'Auto-renewal disabled — you\'ll keep full access until March 31.', hrsAgo: 280 },
-      ],
-    },
-    {
-      subject: 'SSO login loops back to sign-in page',
-      description: 'After our IdP migration, SAML login completes then bounces back to the login form.',
-      status: 'WAITING_FOR_CUSTOMER', priority: 'HIGH', customerIdx: 1, category: 'Account', assigneeIdx: 1, createdHrsAgo: 26,
-      replies: [
-        { author: 'agent', body: 'Please share the new SAML metadata XML so we can update the ACS URL.', hrsAgo: 20 },
-      ],
-    },
-    {
-      subject: 'Feature request: dark mode',
-      description: 'Any plans for a dark theme? Our support team works night shifts.',
-      status: 'OPEN', priority: 'LOW', customerIdx: 2, category: 'General', createdHrsAgo: 3,
-    },
-    {
-      subject: 'Webhook deliveries delayed by 15+ min',
-      description: 'ticket.updated webhooks arrived in batches 15–20 minutes late yesterday afternoon.',
-      status: 'RESOLVED', priority: 'HIGH', customerIdx: 1, category: 'Technical', assigneeIdx: 1, createdHrsAgo: 90,
-      replies: [
-        { author: 'agent', body: 'A queue consumer was stalled — recovered and backlog flushed. Monitoring added.', hrsAgo: 70 },
-      ],
-    },
-    {
-      subject: 'Two-factor auth setup fails',
-      description: 'Scanning the TOTP QR code shows "invalid secret" in my authenticator app.',
-      status: 'OPEN', priority: 'MEDIUM', customerIdx: 0, category: 'Account', createdHrsAgo: 2,
-    },
-    {
-      subject: 'Refund for unused seats',
-      description: 'We removed 3 seats mid-cycle. Expected a prorated refund but nothing arrived yet.',
-      status: 'IN_PROGRESS', priority: 'MEDIUM', customerIdx: 2, category: 'Billing', assigneeIdx: 0, createdHrsAgo: 44,
-      replies: [
-        { author: 'agent', body: 'Refund approved — should post to your card within 5 business days.', hrsAgo: 30 },
-      ],
-    },
+  /* ---------- 60+ tickets ---------- */
+  const statusPool: TicketStatus[] = [
+    // weighted distribution — lively queue for the demo
+    'OPEN', 'OPEN', 'OPEN', 'OPEN', 'OPEN', 'OPEN',
+    'IN_PROGRESS', 'IN_PROGRESS', 'IN_PROGRESS', 'IN_PROGRESS', 'IN_PROGRESS',
+    'WAITING_FOR_CUSTOMER', 'WAITING_FOR_CUSTOMER', 'WAITING_FOR_CUSTOMER',
+    'RESOLVED', 'RESOLVED', 'RESOLVED', 'RESOLVED',
+    'CLOSED', 'CLOSED',
+  ];
+  const priorityPool: Priority[] = [
+    'LOW', 'LOW', 'LOW',
+    'MEDIUM', 'MEDIUM', 'MEDIUM', 'MEDIUM', 'MEDIUM',
+    'HIGH', 'HIGH', 'HIGH', 'HIGH',
+    'URGENT', 'URGENT',
   ];
 
-  for (const t of ticketSeeds) {
-    const customer = customers[t.customerIdx]!;
-    const assignee = t.assigneeIdx !== undefined ? agents[t.assigneeIdx]! : null;
-    const createdAt = hoursAgo(t.createdHrsAgo);
-    const agentReplyHrs = t.replies?.find((r) => r.author === 'agent' && !r.internal)?.hrsAgo;
+  const ticketSeeds: {
+    ticket: Prisma.TicketUncheckedCreateInput;
+    commentCount: number;
+    notifyAssignee: boolean;
+  }[] = [];
 
-    const ticket = await prisma.ticket.create({
-      data: {
+  // deterministic spread: every subject pool entry used at least once
+  const flatSubjects = Object.entries(SUBJECTS).flatMap(([cat, subs]) =>
+    subs.map((s) => ({ cat, s })),
+  );
+  const TOTAL = Math.max(62, flatSubjects.length);
+
+  for (let i = 0; i < TOTAL; i++) {
+    const entry = flatSubjects[i % flatSubjects.length];
+    const category = categories.find((c) => c.name === entry.cat)!;
+    const customer = rand(customers);
+    const status = statusPool[i % statusPool.length];
+    const priority = priorityPool[i % priorityPool.length];
+
+    // createdAt spread over last ~6 days; every 10th is deliberately old
+    const createdAt = i % 10 === 0 ? daysAgo(randInt(20, 30)) : hoursAgo(randInt(1, 140));
+    const assigned = status !== 'OPEN' || i % 4 === 0;
+    const agent = assigned ? rand(agents) : null;
+
+    const resolved = status === 'RESOLVED' || status === 'CLOSED';
+    const hasFirstResponse = status !== 'OPEN' && (assigned || i % 3 === 0);
+
+    const firstResponseAt = hasFirstResponse
+      ? new Date(createdAt.getTime() + randInt(10, 300) * 60_000)
+      : null;
+    const resolvedAt = resolved
+      ? new Date(createdAt.getTime() + randInt(3, 72) * 3_600_000)
+      : null;
+    const closedAt =
+      status === 'CLOSED' ? new Date(resolvedAt!.getTime() + randInt(1, 3) * 86_400_000) : null;
+
+    // SLA snapshot — some tickets intentionally breach (created days ago,
+    // tight targets, no response yet or never resolved)
+    const responseDueAt = new Date(createdAt.getTime() + sla[priority].firstResponseMinutes * 60_000);
+    const resolutionDueAt = new Date(createdAt.getTime() + sla[priority].resolutionMinutes * 60_000);
+
+    ticketSeeds.push({
+      ticket: {
         ticketNumber: await nextTicketNumber(),
-        subject: t.subject,
-        description: t.description,
-        status: t.status,
-        priority: t.priority,
+        subject: entry.s,
+        description:
+          `${entry.s} — reported by ${customer.name}. ` +
+          'Details: ' +
+          rand([
+            'started after the latest update',
+            'happens consistently every time',
+            'intermittent, roughly half of attempts',
+            'only on our production workspace',
+            'affects multiple team members',
+          ]) +
+          '.',
+        status,
+        priority,
+        categoryId: category.id,
         customerId: customer.id,
-        assigneeId: assignee?.id ?? null,
-        categoryId: categories[t.category]!.id,
-        firstResponseAt: agentReplyHrs !== undefined ? hoursAgo(agentReplyHrs) : null,
-        resolvedAt: t.status === 'RESOLVED' || t.status === 'CLOSED' ? hoursAgo(Math.max(t.createdHrsAgo - 20, 1)) : null,
-        closedAt: t.status === 'CLOSED' ? hoursAgo(Math.max(t.createdHrsAgo - 30, 1)) : null,
+        assigneeId: agent?.id ?? null,
         createdAt,
-        updatedAt: createdAt,
+        updatedAt: resolvedAt ?? createdAt,
+        firstResponseAt,
+        resolvedAt,
+        closedAt,
+        responseDueAt,
+        resolutionDueAt,
       },
+      commentCount:
+        status === 'OPEN' ? randInt(0, 2) : status === 'CLOSED' ? randInt(2, 5) : randInt(1, 6),
+      notifyAssignee: assigned && !resolved,
     });
+  }
 
-    await prisma.auditLog.create({
-      data: {
-        actorId: customer.id,
-        action: 'TICKET_CREATED',
+  /* ---------- write tickets + comments + audit in a transaction ---------- */
+  const auditRows: Prisma.AuditLogCreateManyInput[] = [];
+  const notifRows: Prisma.NotificationCreateManyInput[] = [];
+
+  for (const { ticket, commentCount, notifyAssignee } of ticketSeeds) {
+    const created = await prisma.ticket.create({ data: ticket });
+    auditRows.push({
+      actorId: ticket.customerId,
+      action: 'TICKET_CREATED',
+      entityType: 'TICKET',
+      entityId: created.id,
+      metadata: { ticketNumber: ticket.ticketNumber },
+      createdAt: ticket.createdAt,
+    });
+    if (ticket.assigneeId) {
+      auditRows.push({
+        actorId: admin.id,
+        action: 'ASSIGNED',
         entityType: 'TICKET',
-        entityId: ticket.id,
-        metadata: { ticketNumber: ticket.ticketNumber },
-        createdAt,
-      },
-    });
-
-    if (assignee) {
-      await prisma.auditLog.create({
-        data: {
-          actorId: assignee.id,
-          action: 'ASSIGNED',
-          entityType: 'TICKET',
-          entityId: ticket.id,
-          metadata: { to: assignee.id },
-          createdAt: hoursAgo(t.createdHrsAgo - 1),
-        },
+        entityId: created.id,
+        metadata: { from: null, to: ticket.assigneeId },
+        createdAt: new Date(ticket.createdAt!.getTime() + 3_600_000),
       });
-      await prisma.notification.create({
-        data: {
-          recipientId: assignee.id,
-          ticketId: ticket.id,
-          type: 'TICKET_ASSIGNED',
-          message: `Ticket ${ticket.ticketNumber} assigned to you`,
-          createdAt: hoursAgo(t.createdHrsAgo - 1),
-        },
+    }
+    if (ticket.status !== 'OPEN') {
+      auditRows.push({
+        actorId: ticket.assigneeId ?? admin.id,
+        action: 'STATUS_CHANGED',
+        entityType: 'TICKET',
+        entityId: created.id,
+        metadata: { from: 'OPEN', to: ticket.status },
+        createdAt: ticket.resolvedAt ?? new Date(ticket.createdAt!.getTime() + 7_200_000),
+      });
+    }
+    if (notifyAssignee) {
+      notifRows.push({
+        recipientId: ticket.assigneeId!,
+        type: NotificationType.TICKET_ASSIGNED,
+        message: `Ticket ${ticket.ticketNumber} was assigned to you`,
+        ticketId: created.id,
+        createdAt: new Date(ticket.createdAt!.getTime() + 3_600_000),
       });
     }
 
-    for (const r of t.replies ?? []) {
-      const author = r.author === 'agent' ? assignee ?? agentA : customer;
+    /* comment thread: alternate customer/agent, occasional internal note */
+    let cursor = new Date(ticket.createdAt!.getTime() + 30 * 60_000);
+    for (let j = 0; j < commentCount; j++) {
+      const isStaffTurn = j % 2 === 1 && ticket.assigneeId;
+      const authorId = isStaffTurn ? ticket.assigneeId! : ticket.customerId;
+      const isInternal = Boolean(isStaffTurn) && j === commentCount - 1 && Math.random() < 0.3;
       await prisma.comment.create({
         data: {
-          ticketId: ticket.id,
-          authorId: author.id,
-          body: r.body,
-          isInternal: r.internal ?? false,
-          createdAt: hoursAgo(r.hrsAgo),
-          updatedAt: hoursAgo(r.hrsAgo),
+          ticketId: created.id,
+          authorId,
+          isInternal,
+          createdAt: cursor,
+          body: isInternal ? rand(INTERNAL_NOTES) : isStaffTurn ? rand(AGENT_REPLIES) : rand(CUSTOMER_REPLIES),
         },
       });
-      if (!r.internal && r.author === 'agent') {
-        await prisma.notification.create({
-          data: {
-            recipientId: customer.id,
-            ticketId: ticket.id,
-            type: 'TICKET_REPLY',
-            message: `New reply on ${ticket.ticketNumber}`,
-            createdAt: hoursAgo(r.hrsAgo),
-          },
+      auditRows.push({
+        actorId: authorId,
+        action: 'COMMENT_ADDED',
+        entityType: 'TICKET',
+        entityId: created.id,
+        metadata: { isInternal },
+        createdAt: cursor,
+      });
+      if (!isInternal && isStaffTurn) {
+        notifRows.push({
+          recipientId: ticket.customerId,
+          type: NotificationType.TICKET_REPLY,
+          message: `New reply on ${ticket.ticketNumber}`,
+          ticketId: created.id,
+          createdAt: cursor,
         });
       }
+      cursor = new Date(cursor.getTime() + randInt(20, 400) * 60_000);
     }
   }
 
-  const counts = await prisma.$transaction([
-    prisma.user.count(),
+  await prisma.auditLog.createMany({ data: auditRows });
+  await prisma.notification.createMany({ data: notifRows });
+
+  const [tickets, comments, notifications, audits] = await Promise.all([
     prisma.ticket.count(),
     prisma.comment.count(),
     prisma.notification.count(),
     prisma.auditLog.count(),
   ]);
-
   console.log('Seed complete:', {
-    users: counts[0],
-    tickets: counts[1],
-    comments: counts[2],
-    notifications: counts[3],
-    auditLogs: counts[4],
+    users: 8,
+    categories: categories.length,
+    tickets,
+    comments,
+    notifications,
+    audits,
   });
 }
 
 main()
   .catch((e) => {
-    console.error('Seed failed:', e);
+    console.error(e);
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());

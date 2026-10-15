@@ -18,6 +18,7 @@ import { api, ApiRequestError } from '../../lib/api';
 import { SOCKET_EVENTS } from '@helpdesk/shared';
 import { getSocket } from '../../lib/socket';
 import { useAuth } from '../auth/use-auth';
+import { dueIn } from '../../lib/time';
 import {
   EmptyState,
   ErrorState,
@@ -266,8 +267,13 @@ export function TicketDetailPage() {
               {ticket.resolutionDueAt && (
                 <div className="flex justify-between">
                   <dt className="text-slate-500">Resolution due</dt>
-                  <dd className={`font-medium ${ticket.slaBreached ? 'text-red-600' : 'text-slate-800'}`}>
-                    {new Date(ticket.resolutionDueAt).toLocaleString()}
+                  <dd className="text-right">
+                    <span className={`block font-medium ${ticket.slaBreached ? 'text-red-600' : 'text-slate-800'}`}>
+                      {dueIn(ticket.resolutionDueAt)?.label}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      {new Date(ticket.resolutionDueAt).toLocaleString()}
+                    </span>
                   </dd>
                 </div>
               )}

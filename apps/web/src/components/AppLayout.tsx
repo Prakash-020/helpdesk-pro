@@ -204,7 +204,10 @@ export function AppLayout() {
       </aside>
 
       <main className="ml-60 flex-1 p-6 lg:p-8">
-        <div className="mb-2 flex items-center justify-end gap-2">
+        <div className="mb-2 flex items-center justify-end gap-3">
+          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+            Demo environment
+          </span>
           <NotificationBell />
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white">
             {user.name.slice(0, 1).toUpperCase()}

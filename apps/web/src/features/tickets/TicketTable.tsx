@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { MessageSquare } from 'lucide-react';
 import type { TicketSummaryDto } from '@helpdesk/shared';
 import { PriorityBadge, StatusBadge } from '../../components/ui';
+import { timeAgo } from '../../lib/time';
 
 function Avatar({ name }: { name: string }) {
   return (
@@ -54,7 +55,9 @@ function Rows({ tickets, showCustomer }: { tickets: TicketSummaryDto[]; showCust
               {t.commentCount}
             </span>
           </td>
-          <td className="px-4 py-3 text-slate-500">{new Date(t.updatedAt).toLocaleDateString()}</td>
+          <td className="px-4 py-3 text-slate-500" title={new Date(t.updatedAt).toLocaleString()}>
+            {timeAgo(t.updatedAt)}
+          </td>
         </tr>
       ))}
     </tbody>
