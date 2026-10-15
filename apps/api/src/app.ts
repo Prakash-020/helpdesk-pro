@@ -10,6 +10,12 @@ import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { originCheck } from './middleware/origin-check';
 import { attachUser } from './middleware/auth';
 import { authRouter } from './modules/auth/auth.router';
+import { ticketsRouter } from './modules/tickets/tickets.router';
+import { categoriesRouter } from './modules/categories/categories.router';
+import { usersRouter } from './modules/users/users.router';
+import { notificationsRouter } from './modules/notifications/notifications.router';
+import { auditRouter } from './modules/audit/audit.router';
+import { analyticsRouter } from './modules/analytics/analytics.router';
 
 /**
  * Express app assembly — kept separate from server.ts so Supertest can
@@ -62,8 +68,12 @@ export function createApp() {
 
   // Feature routers:
   app.use('/api/v1/auth', authRouter);
-  //   app.use('/api/v1/tickets', ticketsRouter);   (Phase 6)
-  //   app.use('/api/v1/categories', categoriesRouter);
+  app.use('/api/v1/tickets', ticketsRouter);
+  app.use('/api/v1/categories', categoriesRouter);
+  app.use('/api/v1/users', usersRouter);
+  app.use('/api/v1/notifications', notificationsRouter);
+  app.use('/api/v1/audit-logs', auditRouter);
+  app.use('/api/v1/analytics', analyticsRouter);
 
   app.use('/api', notFoundHandler);
   app.use(errorHandler);
